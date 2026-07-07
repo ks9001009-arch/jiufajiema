@@ -3,9 +3,11 @@
   "private": true,
   "packageManager": "pnpm@11.10.0",
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
-    "build": "pnpm -r build",
-    "lint": "pnpm -r lint",
-    "format": "pnpm -r format"
+    "dev": "echo \"Please run pnpm dev:api and pnpm dev:web in separate terminals\"",
+    "dev:api": "pnpm --dir apps/api run start:dev",
+    "dev:web": "pnpm --dir apps/web run dev -- --host 0.0.0.0",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "format": "echo \"format script not configured yet\""
   }
 }
