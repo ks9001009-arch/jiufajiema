@@ -193,3 +193,17 @@ export async function updateTeam(id: string, payload: UpdateTeamPayload) {
     body: JSON.stringify(payload),
   })
 }
+
+export type Role = {
+  id: string
+  name: string
+  code: string
+  description?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function getRoles() {
+  const response = await request<ListResponse<Role>>('/roles')
+  return normalizeList(response)
+}
