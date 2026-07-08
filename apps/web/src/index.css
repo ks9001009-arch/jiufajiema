@@ -580,3 +580,18 @@ button {
   cursor: not-allowed;
   opacity: 0.65;
 }
+
+.modal-form textarea {
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  outline: none;
+  resize: vertical;
+  font: inherit;
+}
+
+.modal-form textarea:focus {
+  border-color: #2557ff;
+  box-shadow: 0 0 0 4px rgba(37, 87, 255, 0.12);
+}

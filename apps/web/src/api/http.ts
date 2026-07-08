@@ -207,3 +207,16 @@ export async function getRoles() {
   const response = await request<ListResponse<Role>>('/roles')
   return normalizeList(response)
 }
+
+export type CreateRolePayload = {
+  name: string
+  code: string
+  description?: string
+}
+
+export async function createRole(payload: CreateRolePayload) {
+  return request<Role>('/roles', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
