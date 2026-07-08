@@ -93,3 +93,36 @@ export async function login(username: string, password: string) {
 export async function getMe() {
   return request<CurrentUser>('/auth/me')
 }
+
+export type CompanyStatus = 'ACTIVE' | 'DISABLED'
+
+export type Company = {
+  id: string
+  name: string
+  code: string
+  status: CompanyStatus
+  createdAt?: string
+  updatedAt?: string
+}
+
+type ListResponse<T> =
+  | T[]
+  | {
+      data?: T[]
+      items?: T[]
+      list?: T[]
+      total?: number
+    }
+
+function normalizeList<T>(response: ListResponse<T>) {
+  if (Array.isArray(response)) {
+    return response
+  }
+
+  return response.data || response.items || response.list || []
+}
+
+export async function getCompanies() {
+  const response = await request<ListResponse<Company>>('/companies')
+  return normalizeList(response)
+}

@@ -429,3 +429,60 @@ button {
   color: #98a2b3;
   padding: 42px 20px;
 }
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.secondary-button {
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  color: #344054;
+  font-weight: 700;
+  background: #ffffff;
+}
+
+.secondary-button:hover {
+  background: #f9fafb;
+}
+
+.table-error {
+  margin: 16px 20px 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.status-badge.active {
+  color: #027a48;
+  background: #ecfdf3;
+}
+
+.status-badge.disabled {
+  color: #667085;
+  background: #f2f4f7;
+}
+
+.text-button {
+  border: 0;
+  padding: 0;
+  color: #2557ff;
+  font-weight: 700;
+  background: transparent;
+}
