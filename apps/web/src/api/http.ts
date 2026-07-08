@@ -126,3 +126,15 @@ export async function getCompanies() {
   const response = await request<ListResponse<Company>>('/companies')
   return normalizeList(response)
 }
+
+export type CreateCompanyPayload = {
+  name: string
+  code: string
+}
+
+export async function createCompany(payload: CreateCompanyPayload) {
+  return request<Company>('/companies', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
