@@ -81,7 +81,7 @@ function App() {
         return <AuditLogPage />
       case 'dashboard':
       default:
-        return <DashboardPage />
+        return <DashboardPage user={user} />
     }
   }
 
@@ -110,3 +110,4 @@ function App() {
 }
 
 export default App
+
