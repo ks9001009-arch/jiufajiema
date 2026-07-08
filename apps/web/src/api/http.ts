@@ -302,3 +302,31 @@ export async function updateUser(id: string, payload: UpdateUserPayload) {
     body: JSON.stringify(payload),
   })
 }
+
+export type AuditLog = {
+  id: string
+  actorUserId?: string | null
+  actorUser?: {
+    id: string
+    username: string
+    displayName?: string | null
+  } | null
+  companyId?: string | null
+  company?: {
+    id: string
+    name: string
+  } | null
+  action: string
+  targetType?: string | null
+  targetId?: string | null
+  beforeData?: unknown
+  afterData?: unknown
+  ipAddress?: string | null
+  userAgent?: string | null
+  createdAt?: string
+}
+
+export async function getAuditLogs() {
+  const response = await request<ListResponse<AuditLog>>('/audit-logs')
+  return normalizeList(response)
+}
