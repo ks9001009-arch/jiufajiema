@@ -138,3 +138,16 @@ export async function createCompany(payload: CreateCompanyPayload) {
     body: JSON.stringify(payload),
   })
 }
+
+export type UpdateCompanyPayload = {
+  name?: string
+  code?: string
+  status?: CompanyStatus
+}
+
+export async function updateCompany(id: string, payload: UpdateCompanyPayload) {
+  return request<Company>(`/companies/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}

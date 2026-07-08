@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
-import { createCompany, getCompanies } from '../api/http'
-import type { Company } from '../api/http'
+import { createCompany, getCompanies, updateCompany } from '../api/http'
+import type { Company, CompanyStatus } from '../api/http'
 
 function formatDate(value?: string) {
   if (!value) {
@@ -40,10 +40,14 @@ export function CompanyPage() {
   const [error, setError] = useState('')
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
+  const [status, setStatus] = useState<CompanyStatus>('ACTIVE')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+
+  const isEditing = Boolean(editingCompany)
 
   async function loadCompanies() {
     setLoading(true)
@@ -64,13 +68,24 @@ export function CompanyPage() {
   }, [])
 
   function openCreateModal() {
+    setEditingCompany(null)
     setName('')
     setCode('')
+    setStatus('ACTIVE')
     setFormError('')
     setModalOpen(true)
   }
 
-  function closeCreateModal() {
+  function openEditModal(company: Company) {
+    setEditingCompany(company)
+    setName(company.name)
+    setCode(company.code)
+    setStatus(company.status)
+    setFormError('')
+    setModalOpen(true)
+  }
+
+  function closeModal() {
     if (saving) {
       return
     }
@@ -78,7 +93,7 @@ export function CompanyPage() {
     setModalOpen(false)
   }
 
-  async function handleCreateCompany() {
+  async function handleSubmitCompany() {
     const trimmedName = name.trim()
     const trimmedCode = code.trim()
 
@@ -96,15 +111,23 @@ export function CompanyPage() {
     setFormError('')
 
     try {
-      await createCompany({
-        name: trimmedName,
-        code: trimmedCode,
-      })
+      if (editingCompany) {
+        await updateCompany(editingCompany.id, {
+          name: trimmedName,
+          code: trimmedCode,
+          status,
+        })
+      } else {
+        await createCompany({
+          name: trimmedName,
+          code: trimmedCode,
+        })
+      }
 
       setModalOpen(false)
       await loadCompanies()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : '新增公司失败')
+      setFormError(err instanceof Error ? err.message : isEditing ? '编辑公司失败' : '新增公司失败')
     } finally {
       setSaving(false)
     }
@@ -115,7 +138,7 @@ export function CompanyPage() {
       <div className="page-header">
         <div>
           <h2>公司管理</h2>
-          <p>管理平台内的公司主体，当前页面已经接入后端公司列表和新增接口。</p>
+          <p>管理平台内的公司主体，当前页面已经接入列表、新增和编辑接口。</p>
         </div>
 
         <div className="page-actions">
@@ -169,7 +192,11 @@ export function CompanyPage() {
                   </td>
                   <td>{formatDate(company.createdAt)}</td>
                   <td>
-                    <button className="text-button" type="button">
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() => openEditModal(company)}
+                    >
                       编辑
                     </button>
                   </td>
@@ -189,11 +216,11 @@ export function CompanyPage() {
           <div className="modal-card">
             <div className="modal-header">
               <div>
-                <h3>新增公司</h3>
-                <p>创建一个新的公司主体</p>
+                <h3>{isEditing ? '编辑公司' : '新增公司'}</h3>
+                <p>{isEditing ? '修改公司主体信息' : '创建一个新的公司主体'}</p>
               </div>
 
-              <button className="modal-close" type="button" onClick={closeCreateModal}>
+              <button className="modal-close" type="button" onClick={closeModal}>
                 ×
               </button>
             </div>
@@ -217,6 +244,17 @@ export function CompanyPage() {
                 />
               </label>
 
+              <label>
+                <span>状态</span>
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value as CompanyStatus)}
+                >
+                  <option value="ACTIVE">启用</option>
+                  <option value="DISABLED">停用</option>
+                </select>
+              </label>
+
               {formError ? <div className="form-error">{formError}</div> : null}
             </div>
 
@@ -224,7 +262,7 @@ export function CompanyPage() {
               <button
                 className="secondary-button"
                 type="button"
-                onClick={closeCreateModal}
+                onClick={closeModal}
                 disabled={saving}
               >
                 取消
@@ -233,10 +271,10 @@ export function CompanyPage() {
               <button
                 className="primary-button"
                 type="button"
-                onClick={handleCreateCompany}
+                onClick={handleSubmitCompany}
                 disabled={saving}
               >
-                {saving ? '保存中...' : '确认新增'}
+                {saving ? '保存中...' : isEditing ? '保存修改' : '确认新增'}
               </button>
             </div>
           </div>

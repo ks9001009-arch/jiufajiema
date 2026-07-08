@@ -1,16 +1,15 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
-
-export enum CompanyStatus {
-  ACTIVE = 'ACTIVE',
-  DISABLED = 'DISABLED',
-}
+﻿import { IsIn, IsOptional, IsString } from 'class-validator'
 
 export class UpdateCompanyDto {
   @IsOptional()
   @IsString()
-  name?: string;
+  name?: string
 
   @IsOptional()
-  @IsEnum(CompanyStatus)
-  status?: CompanyStatus;
+  @IsString()
+  code?: string
+
+  @IsOptional()
+  @IsIn(['ACTIVE', 'DISABLED'])
+  status?: 'ACTIVE' | 'DISABLED'
 }
