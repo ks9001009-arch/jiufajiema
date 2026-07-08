@@ -6,14 +6,20 @@ import {
   getMe,
   type CurrentUser,
 } from './api/http'
-import { AdminLayout } from './layouts/AdminLayout'
+import { AdminLayout, type AdminPageKey } from './layouts/AdminLayout'
+import { AuditLogPage } from './pages/AuditLogPage'
+import { CompanyPage } from './pages/CompanyPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
+import { RolePage } from './pages/RolePage'
+import { TeamPage } from './pages/TeamPage'
+import { UserPage } from './pages/UserPage'
 
 function App() {
   const [token, setToken] = useState<string | null>(() => getAccessToken())
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [checking, setChecking] = useState(Boolean(getAccessToken()))
+  const [activePage, setActivePage] = useState<AdminPageKey>('dashboard')
 
   useEffect(() => {
     if (!token) {
@@ -51,12 +57,32 @@ function App() {
 
   function handleLogin(newToken: string) {
     setToken(newToken)
+    setActivePage('dashboard')
   }
 
   function handleLogout() {
     clearAccessToken()
     setToken(null)
     setUser(null)
+    setActivePage('dashboard')
+  }
+
+  function renderPage() {
+    switch (activePage) {
+      case 'companies':
+        return <CompanyPage />
+      case 'teams':
+        return <TeamPage />
+      case 'roles':
+        return <RolePage />
+      case 'users':
+        return <UserPage />
+      case 'auditLogs':
+        return <AuditLogPage />
+      case 'dashboard':
+      default:
+        return <DashboardPage />
+    }
   }
 
   if (checking) {
@@ -72,8 +98,13 @@ function App() {
   }
 
   return (
-    <AdminLayout user={user} onLogout={handleLogout}>
-      <DashboardPage />
+    <AdminLayout
+      user={user}
+      activePage={activePage}
+      onPageChange={setActivePage}
+      onLogout={handleLogout}
+    >
+      {renderPage()}
     </AdminLayout>
   )
 }

@@ -1,22 +1,38 @@
 ﻿import type { ReactNode } from 'react'
 import type { CurrentUser } from '../api/http'
 
+export type AdminPageKey =
+  | 'dashboard'
+  | 'companies'
+  | 'teams'
+  | 'roles'
+  | 'users'
+  | 'auditLogs'
+
 type AdminLayoutProps = {
   user: CurrentUser | null
+  activePage: AdminPageKey
+  onPageChange: (page: AdminPageKey) => void
   onLogout: () => void
   children: ReactNode
 }
 
-const menus = [
-  '后台首页',
-  '公司管理',
-  '团队管理',
-  '角色管理',
-  '用户管理',
-  '操作日志',
+const menus: Array<{ key: AdminPageKey; label: string }> = [
+  { key: 'dashboard', label: '后台首页' },
+  { key: 'companies', label: '公司管理' },
+  { key: 'teams', label: '团队管理' },
+  { key: 'roles', label: '角色管理' },
+  { key: 'users', label: '用户管理' },
+  { key: 'auditLogs', label: '操作日志' },
 ]
 
-export function AdminLayout({ user, onLogout, children }: AdminLayoutProps) {
+export function AdminLayout({
+  user,
+  activePage,
+  onPageChange,
+  onLogout,
+  children,
+}: AdminLayoutProps) {
   const displayName = user?.name || user?.username || user?.phone || '管理员'
 
   return (
@@ -31,13 +47,14 @@ export function AdminLayout({ user, onLogout, children }: AdminLayoutProps) {
         </div>
 
         <nav className="sidebar-menu">
-          {menus.map((menu, index) => (
+          {menus.map((menu) => (
             <button
-              key={menu}
+              key={menu.key}
               type="button"
-              className={index === 0 ? 'active' : ''}
+              className={activePage === menu.key ? 'active' : ''}
+              onClick={() => onPageChange(menu.key)}
             >
-              {menu}
+              {menu.label}
             </button>
           ))}
         </nav>
