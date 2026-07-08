@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
-import { createRole, getRoles } from '../api/http'
+import { createRole, getRoles, updateRole } from '../api/http'
 import type { Role } from '../api/http'
 
 function formatDate(value?: string) {
@@ -28,11 +28,14 @@ export function RolePage() {
   const [error, setError] = useState('')
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+
+  const isEditing = Boolean(editingRole)
 
   async function loadRoles() {
     setLoading(true)
@@ -53,6 +56,7 @@ export function RolePage() {
   }, [])
 
   function openCreateModal() {
+    setEditingRole(null)
     setName('')
     setCode('')
     setDescription('')
@@ -60,7 +64,16 @@ export function RolePage() {
     setModalOpen(true)
   }
 
-  function closeCreateModal() {
+  function openEditModal(role: Role) {
+    setEditingRole(role)
+    setName(role.name)
+    setCode(role.code)
+    setDescription(role.description || '')
+    setFormError('')
+    setModalOpen(true)
+  }
+
+  function closeModal() {
     if (saving) {
       return
     }
@@ -68,7 +81,7 @@ export function RolePage() {
     setModalOpen(false)
   }
 
-  async function handleCreateRole() {
+  async function handleSubmitRole() {
     const trimmedName = name.trim()
     const trimmedCode = code.trim()
     const trimmedDescription = description.trim()
@@ -87,16 +100,24 @@ export function RolePage() {
     setFormError('')
 
     try {
-      await createRole({
-        name: trimmedName,
-        code: trimmedCode,
-        description: trimmedDescription || undefined,
-      })
+      if (editingRole) {
+        await updateRole(editingRole.id, {
+          name: trimmedName,
+          code: trimmedCode,
+          description: trimmedDescription || undefined,
+        })
+      } else {
+        await createRole({
+          name: trimmedName,
+          code: trimmedCode,
+          description: trimmedDescription || undefined,
+        })
+      }
 
       setModalOpen(false)
       await loadRoles()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : '新增角色失败')
+      setFormError(err instanceof Error ? err.message : isEditing ? '编辑角色失败' : '新增角色失败')
     } finally {
       setSaving(false)
     }
@@ -107,7 +128,7 @@ export function RolePage() {
       <div className="page-header">
         <div>
           <h2>角色管理</h2>
-          <p>管理后台角色和权限分组，当前页面已经接入角色列表和新增接口。</p>
+          <p>管理后台角色和权限分组，当前页面已经接入列表、新增和编辑接口。</p>
         </div>
 
         <div className="page-actions">
@@ -157,7 +178,11 @@ export function RolePage() {
                   <td>{role.description || '-'}</td>
                   <td>{formatDate(role.createdAt)}</td>
                   <td>
-                    <button className="text-button" type="button">
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() => openEditModal(role)}
+                    >
                       编辑
                     </button>
                   </td>
@@ -177,11 +202,11 @@ export function RolePage() {
           <div className="modal-card">
             <div className="modal-header">
               <div>
-                <h3>新增角色</h3>
-                <p>创建一个新的后台角色</p>
+                <h3>{isEditing ? '编辑角色' : '新增角色'}</h3>
+                <p>{isEditing ? '修改后台角色信息' : '创建一个新的后台角色'}</p>
               </div>
 
-              <button className="modal-close" type="button" onClick={closeCreateModal}>
+              <button className="modal-close" type="button" onClick={closeModal}>
                 ×
               </button>
             </div>
@@ -222,7 +247,7 @@ export function RolePage() {
               <button
                 className="secondary-button"
                 type="button"
-                onClick={closeCreateModal}
+                onClick={closeModal}
                 disabled={saving}
               >
                 取消
@@ -231,10 +256,10 @@ export function RolePage() {
               <button
                 className="primary-button"
                 type="button"
-                onClick={handleCreateRole}
+                onClick={handleSubmitRole}
                 disabled={saving}
               >
-                {saving ? '保存中...' : '确认新增'}
+                {saving ? '保存中...' : isEditing ? '保存修改' : '确认新增'}
               </button>
             </div>
           </div>

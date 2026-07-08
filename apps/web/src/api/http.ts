@@ -220,3 +220,16 @@ export async function createRole(payload: CreateRolePayload) {
     body: JSON.stringify(payload),
   })
 }
+
+export type UpdateRolePayload = {
+  name?: string
+  code?: string
+  description?: string
+}
+
+export async function updateRole(id: string, payload: UpdateRolePayload) {
+  return request<Role>(`/roles/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
