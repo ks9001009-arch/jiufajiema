@@ -181,3 +181,15 @@ export async function createTeam(payload: CreateTeamPayload) {
     body: JSON.stringify(payload),
   })
 }
+
+export type UpdateTeamPayload = {
+  name?: string
+  companyId?: string
+}
+
+export async function updateTeam(id: string, payload: UpdateTeamPayload) {
+  return request<Team>(`/teams/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}

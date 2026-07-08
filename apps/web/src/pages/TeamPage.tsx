@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
-import { createTeam, getCompanies, getTeams } from '../api/http'
+import { createTeam, getCompanies, getTeams, updateTeam } from '../api/http'
 import type { Company, Team } from '../api/http'
 
 function formatDate(value?: string) {
@@ -38,10 +38,13 @@ export function TeamPage() {
   const [error, setError] = useState('')
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [name, setName] = useState('')
   const [companyId, setCompanyId] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+
+  const isEditing = Boolean(editingTeam)
 
   async function loadData() {
     setLoading(true)
@@ -71,13 +74,22 @@ export function TeamPage() {
   }, [])
 
   function openCreateModal() {
+    setEditingTeam(null)
     setName('')
     setCompanyId(companies[0]?.id || '')
     setFormError('')
     setModalOpen(true)
   }
 
-  function closeCreateModal() {
+  function openEditModal(team: Team) {
+    setEditingTeam(team)
+    setName(team.name)
+    setCompanyId(team.companyId)
+    setFormError('')
+    setModalOpen(true)
+  }
+
+  function closeModal() {
     if (saving) {
       return
     }
@@ -85,7 +97,7 @@ export function TeamPage() {
     setModalOpen(false)
   }
 
-  async function handleCreateTeam() {
+  async function handleSubmitTeam() {
     const trimmedName = name.trim()
 
     if (!trimmedName) {
@@ -102,15 +114,22 @@ export function TeamPage() {
     setFormError('')
 
     try {
-      await createTeam({
-        name: trimmedName,
-        companyId,
-      })
+      if (editingTeam) {
+        await updateTeam(editingTeam.id, {
+          name: trimmedName,
+          companyId,
+        })
+      } else {
+        await createTeam({
+          name: trimmedName,
+          companyId,
+        })
+      }
 
       setModalOpen(false)
       await loadData()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : '新增团队失败')
+      setFormError(err instanceof Error ? err.message : isEditing ? '编辑团队失败' : '新增团队失败')
     } finally {
       setSaving(false)
     }
@@ -121,7 +140,7 @@ export function TeamPage() {
       <div className="page-header">
         <div>
           <h2>团队管理</h2>
-          <p>管理公司下的业务团队，当前页面已经接入团队列表和新增接口。</p>
+          <p>管理公司下的业务团队，当前页面已经接入列表、新增和编辑接口。</p>
         </div>
 
         <div className="page-actions">
@@ -169,7 +188,11 @@ export function TeamPage() {
                   <td>{getCompanyName(team, companies)}</td>
                   <td>{formatDate(team.createdAt)}</td>
                   <td>
-                    <button className="text-button" type="button">
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() => openEditModal(team)}
+                    >
                       编辑
                     </button>
                   </td>
@@ -189,11 +212,11 @@ export function TeamPage() {
           <div className="modal-card">
             <div className="modal-header">
               <div>
-                <h3>新增团队</h3>
-                <p>创建一个新的业务团队</p>
+                <h3>{isEditing ? '编辑团队' : '新增团队'}</h3>
+                <p>{isEditing ? '修改业务团队信息' : '创建一个新的业务团队'}</p>
               </div>
 
-              <button className="modal-close" type="button" onClick={closeCreateModal}>
+              <button className="modal-close" type="button" onClick={closeModal}>
                 ×
               </button>
             </div>
@@ -233,7 +256,7 @@ export function TeamPage() {
               <button
                 className="secondary-button"
                 type="button"
-                onClick={closeCreateModal}
+                onClick={closeModal}
                 disabled={saving}
               >
                 取消
@@ -242,10 +265,10 @@ export function TeamPage() {
               <button
                 className="primary-button"
                 type="button"
-                onClick={handleCreateTeam}
+                onClick={handleSubmitTeam}
                 disabled={saving}
               >
-                {saving ? '保存中...' : '确认新增'}
+                {saving ? '保存中...' : isEditing ? '保存修改' : '确认新增'}
               </button>
             </div>
           </div>
