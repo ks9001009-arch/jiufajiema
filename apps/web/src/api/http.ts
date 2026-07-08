@@ -151,3 +151,21 @@ export async function updateCompany(id: string, payload: UpdateCompanyPayload) {
     body: JSON.stringify(payload),
   })
 }
+
+export type Team = {
+  id: string
+  name: string
+  companyId: string
+  company?: {
+    id: string
+    name: string
+    code?: string
+  } | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function getTeams() {
+  const response = await request<ListResponse<Team>>('/teams')
+  return normalizeList(response)
+}
