@@ -286,3 +286,19 @@ export async function createUser(payload: CreateUserPayload) {
     body: JSON.stringify(payload),
   })
 }
+
+export type UpdateUserPayload = {
+  username?: string
+  displayName?: string
+  companyId?: string
+  teamId?: string
+  roleId?: string
+  status?: AdminUserStatus
+}
+
+export async function updateUser(id: string, payload: UpdateUserPayload) {
+  return request<AdminUser>(`/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}

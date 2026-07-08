@@ -1,24 +1,27 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
-
-export enum UserStatus {
-  ACTIVE = 'ACTIVE',
-  DISABLED = 'DISABLED',
-}
+﻿import { IsIn, IsOptional, IsString } from 'class-validator'
 
 export class UpdateUserDto {
   @IsOptional()
   @IsString()
-  displayName?: string;
-
-  @IsOptional()
-  @IsEnum(UserStatus)
-  status?: UserStatus;
+  username?: string
 
   @IsOptional()
   @IsString()
-  teamId?: string;
+  displayName?: string
 
   @IsOptional()
   @IsString()
-  roleId?: string;
+  companyId?: string
+
+  @IsOptional()
+  @IsString()
+  teamId?: string
+
+  @IsOptional()
+  @IsString()
+  roleId?: string
+
+  @IsOptional()
+  @IsIn(['ACTIVE', 'DISABLED'])
+  status?: 'ACTIVE' | 'DISABLED'
 }

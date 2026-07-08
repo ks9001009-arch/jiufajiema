@@ -5,6 +5,7 @@ import {
   getRoles,
   getTeams,
   getUsers,
+  updateUser,
 } from '../api/http'
 import type {
   AdminUser,
@@ -94,6 +95,7 @@ export function UserPage() {
   const [error, setError] = useState('')
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -103,6 +105,8 @@ export function UserPage() {
   const [status, setStatus] = useState<AdminUserStatus>('ACTIVE')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+
+  const isEditing = Boolean(editingUser)
 
   async function loadData() {
     setLoading(true)
@@ -132,6 +136,7 @@ export function UserPage() {
   }, [])
 
   function openCreateModal() {
+    setEditingUser(null)
     setUsername('')
     setPassword('')
     setDisplayName('')
@@ -143,7 +148,20 @@ export function UserPage() {
     setModalOpen(true)
   }
 
-  function closeCreateModal() {
+  function openEditModal(user: AdminUser) {
+    setEditingUser(user)
+    setUsername(user.username)
+    setPassword('')
+    setDisplayName(user.displayName || user.name || '')
+    setCompanyId(user.companyId || '')
+    setTeamId(user.teamId || '')
+    setRoleId(user.roleId || '')
+    setStatus(user.status || 'ACTIVE')
+    setFormError('')
+    setModalOpen(true)
+  }
+
+  function closeModal() {
     if (saving) {
       return
     }
@@ -151,7 +169,7 @@ export function UserPage() {
     setModalOpen(false)
   }
 
-  async function handleCreateUser() {
+  async function handleSubmitUser() {
     const trimmedUsername = username.trim()
     const trimmedPassword = password.trim()
     const trimmedDisplayName = displayName.trim()
@@ -161,12 +179,12 @@ export function UserPage() {
       return
     }
 
-    if (!trimmedPassword) {
+    if (!isEditing && !trimmedPassword) {
       setFormError('请输入密码')
       return
     }
 
-    if (trimmedPassword.length < 6) {
+    if (!isEditing && trimmedPassword.length < 6) {
       setFormError('密码至少 6 位')
       return
     }
@@ -175,20 +193,31 @@ export function UserPage() {
     setFormError('')
 
     try {
-      await createUser({
-        username: trimmedUsername,
-        password: trimmedPassword,
-        displayName: trimmedDisplayName || undefined,
-        companyId: companyId || undefined,
-        teamId: teamId || undefined,
-        roleId: roleId || undefined,
-        status,
-      })
+      if (editingUser) {
+        await updateUser(editingUser.id, {
+          username: trimmedUsername,
+          displayName: trimmedDisplayName || undefined,
+          companyId: companyId || undefined,
+          teamId: teamId || undefined,
+          roleId: roleId || undefined,
+          status,
+        })
+      } else {
+        await createUser({
+          username: trimmedUsername,
+          password: trimmedPassword,
+          displayName: trimmedDisplayName || undefined,
+          companyId: companyId || undefined,
+          teamId: teamId || undefined,
+          roleId: roleId || undefined,
+          status,
+        })
+      }
 
       setModalOpen(false)
       await loadData()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : '新增用户失败')
+      setFormError(err instanceof Error ? err.message : isEditing ? '编辑用户失败' : '新增用户失败')
     } finally {
       setSaving(false)
     }
@@ -203,7 +232,7 @@ export function UserPage() {
       <div className="page-header">
         <div>
           <h2>用户管理</h2>
-          <p>管理后台账号、员工账号、所属公司团队和角色，当前页面已经接入用户列表和新增接口。</p>
+          <p>管理后台账号、员工账号、所属公司团队和角色，当前页面已经接入列表、新增和编辑接口。</p>
         </div>
 
         <div className="page-actions">
@@ -263,7 +292,11 @@ export function UserPage() {
                   </td>
                   <td>{formatDate(user.createdAt)}</td>
                   <td>
-                    <button className="text-button" type="button">
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() => openEditModal(user)}
+                    >
                       编辑
                     </button>
                   </td>
@@ -283,11 +316,11 @@ export function UserPage() {
           <div className="modal-card">
             <div className="modal-header">
               <div>
-                <h3>新增用户</h3>
-                <p>创建一个新的后台或员工账号</p>
+                <h3>{isEditing ? '编辑用户' : '新增用户'}</h3>
+                <p>{isEditing ? '修改账号基础信息' : '创建一个新的后台或员工账号'}</p>
               </div>
 
-              <button className="modal-close" type="button" onClick={closeCreateModal}>
+              <button className="modal-close" type="button" onClick={closeModal}>
                 ×
               </button>
             </div>
@@ -303,16 +336,18 @@ export function UserPage() {
                 />
               </label>
 
-              <label>
-                <span>密码</span>
-                <input
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="至少 6 位"
-                  type="password"
-                  autoComplete="new-password"
-                />
-              </label>
+              {!isEditing ? (
+                <label>
+                  <span>密码</span>
+                  <input
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="至少 6 位"
+                    type="password"
+                    autoComplete="new-password"
+                  />
+                </label>
+              ) : null}
 
               <label>
                 <span>姓名</span>
@@ -389,7 +424,7 @@ export function UserPage() {
               <button
                 className="secondary-button"
                 type="button"
-                onClick={closeCreateModal}
+                onClick={closeModal}
                 disabled={saving}
               >
                 取消
@@ -398,10 +433,10 @@ export function UserPage() {
               <button
                 className="primary-button"
                 type="button"
-                onClick={handleCreateUser}
+                onClick={handleSubmitUser}
                 disabled={saving}
               >
-                {saving ? '保存中...' : '确认新增'}
+                {saving ? '保存中...' : isEditing ? '保存修改' : '确认新增'}
               </button>
             </div>
           </div>
