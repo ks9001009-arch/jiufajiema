@@ -20,4 +20,8 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   roleId?: string;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
 }

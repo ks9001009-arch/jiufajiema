@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -56,7 +57,7 @@ export class UsersService {
       const user = await this.prisma.user.create({
         data: {
           username: dto.username,
-          passwordHash: PENDING_PASSWORD_HASH,
+          passwordHash: await this.resolvePasswordHash(dto.password),
           displayName: dto.displayName,
           companyId: dto.companyId,
           teamId: dto.teamId,
@@ -192,6 +193,14 @@ export class UsersService {
         `Team with id "${team.id}" does not belong to company with id "${companyId}"`,
       );
     }
+  }
+
+  private async resolvePasswordHash(password?: string) {
+    if (password) {
+      return bcrypt.hash(password, 10);
+    }
+
+    return PENDING_PASSWORD_HASH;
   }
 
   private toPublicUser(user: UserRecord) {
