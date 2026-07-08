@@ -36,7 +36,7 @@ export class RolesService {
     return role;
   }
 
-  async create(dto: CreateRoleDto) {
+  async create(dto: CreateRoleDto, actorUserId: string) {
     try {
       const role = await this.prisma.role.create({
         data: {
@@ -51,6 +51,7 @@ export class RolesService {
           action: 'role.create',
           targetType: 'Role',
           targetId: role.id,
+          actorUserId,
           afterData: this.toAuditData(role),
         },
       });
@@ -67,7 +68,7 @@ export class RolesService {
     }
   }
 
-  async update(id: string, dto: UpdateRoleDto) {
+  async update(id: string, dto: UpdateRoleDto, actorUserId: string) {
     const existing = await this.prisma.role.findUnique({ where: { id } });
 
     if (!existing) {
@@ -87,6 +88,7 @@ export class RolesService {
         action: 'role.update',
         targetType: 'Role',
         targetId: role.id,
+        actorUserId,
         beforeData: this.toAuditData(existing),
         afterData: this.toAuditData(role),
       },

@@ -36,7 +36,7 @@ export class CompaniesService {
     return company;
   }
 
-  async create(dto: CreateCompanyDto) {
+  async create(dto: CreateCompanyDto, actorUserId: string) {
     try {
       const company = await this.prisma.company.create({
         data: {
@@ -50,6 +50,7 @@ export class CompaniesService {
           action: 'company.create',
           targetType: 'Company',
           targetId: company.id,
+          actorUserId,
           companyId: company.id,
           afterData: this.toAuditData(company),
         },
@@ -67,7 +68,7 @@ export class CompaniesService {
     }
   }
 
-  async update(id: string, dto: UpdateCompanyDto) {
+  async update(id: string, dto: UpdateCompanyDto, actorUserId: string) {
     const existing = await this.prisma.company.findUnique({ where: { id } });
 
     if (!existing) {
@@ -87,6 +88,7 @@ export class CompaniesService {
         action: 'company.update',
         targetType: 'Company',
         targetId: company.id,
+        actorUserId,
         companyId: company.id,
         beforeData: this.toAuditData(existing),
         afterData: this.toAuditData(company),

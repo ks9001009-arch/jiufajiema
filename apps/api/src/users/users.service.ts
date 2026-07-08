@@ -50,7 +50,7 @@ export class UsersService {
     return this.toPublicUser(user);
   }
 
-  async create(dto: CreateUserDto) {
+  async create(dto: CreateUserDto, actorUserId: string) {
     await this.validateCreateRelations(dto);
 
     try {
@@ -70,6 +70,7 @@ export class UsersService {
           action: 'user.create',
           targetType: 'User',
           targetId: user.id,
+          actorUserId,
           companyId: user.companyId,
           afterData: this.toAuditData(user),
         },
@@ -87,7 +88,7 @@ export class UsersService {
     }
   }
 
-  async update(id: string, dto: UpdateUserDto) {
+  async update(id: string, dto: UpdateUserDto, actorUserId: string) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
 
     if (!existing) {
@@ -111,6 +112,7 @@ export class UsersService {
         action: 'user.update',
         targetType: 'User',
         targetId: user.id,
+        actorUserId,
         companyId: user.companyId,
         beforeData: this.toAuditData(existing),
         afterData: this.toAuditData(user),

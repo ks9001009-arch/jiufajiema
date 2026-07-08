@@ -34,7 +34,7 @@ export class TeamsService {
     return team;
   }
 
-  async create(dto: CreateTeamDto) {
+  async create(dto: CreateTeamDto, actorUserId: string) {
     const company = await this.prisma.company.findUnique({
       where: { id: dto.companyId },
     });
@@ -57,6 +57,7 @@ export class TeamsService {
         action: 'team.create',
         targetType: 'Team',
         targetId: team.id,
+        actorUserId,
         companyId: team.companyId,
         afterData: this.toAuditData(team),
       },
@@ -65,7 +66,7 @@ export class TeamsService {
     return team;
   }
 
-  async update(id: string, dto: UpdateTeamDto) {
+  async update(id: string, dto: UpdateTeamDto, actorUserId: string) {
     const existingTeam = await this.prisma.team.findUnique({
       where: { id },
     });
@@ -86,6 +87,7 @@ export class TeamsService {
         action: 'team.update',
         targetType: 'Team',
         targetId: updatedTeam.id,
+        actorUserId,
         companyId: existingTeam.companyId,
         beforeData: this.toAuditData(existingTeam),
         afterData: this.toAuditData(updatedTeam),

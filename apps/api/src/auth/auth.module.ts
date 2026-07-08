@@ -17,5 +17,6 @@ const jwtSecret = process.env.JWT_SECRET ?? 'dev_jwt_secret';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtAuthGuard],
+  exports: [JwtAuthGuard],
 })
 export class AuthModule {}
