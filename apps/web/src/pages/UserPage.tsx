@@ -1,6 +1,18 @@
 ﻿import { useEffect, useState } from 'react'
-import { getUsers } from '../api/http'
-import type { AdminUser, AdminUserStatus } from '../api/http'
+import {
+  createUser,
+  getCompanies,
+  getRoles,
+  getTeams,
+  getUsers,
+} from '../api/http'
+import type {
+  AdminUser,
+  AdminUserStatus,
+  Company,
+  Role,
+  Team,
+} from '../api/http'
 
 function formatDate(value?: string) {
   if (!value) {
@@ -39,10 +51,6 @@ function getStatusClass(status?: AdminUserStatus) {
     return 'active'
   }
 
-  if (status === 'DISABLED') {
-    return 'disabled'
-  }
-
   return 'disabled'
 }
 
@@ -50,30 +58,68 @@ function getDisplayName(user: AdminUser) {
   return user.displayName || user.name || '-'
 }
 
-function getCompanyName(user: AdminUser) {
-  return user.company?.name || user.companyId || '-'
+function getCompanyName(user: AdminUser, companies: Company[]) {
+  if (user.company?.name) {
+    return user.company.name
+  }
+
+  const company = companies.find((item) => item.id === user.companyId)
+  return company?.name || user.companyId || '-'
 }
 
-function getTeamName(user: AdminUser) {
-  return user.team?.name || user.teamId || '-'
+function getTeamName(user: AdminUser, teams: Team[]) {
+  if (user.team?.name) {
+    return user.team.name
+  }
+
+  const team = teams.find((item) => item.id === user.teamId)
+  return team?.name || user.teamId || '-'
 }
 
-function getRoleName(user: AdminUser) {
-  return user.role?.name || user.roleId || '-'
+function getRoleName(user: AdminUser, roles: Role[]) {
+  if (user.role?.name) {
+    return user.role.name
+  }
+
+  const role = roles.find((item) => item.id === user.roleId)
+  return role?.name || user.roleId || '-'
 }
 
 export function UserPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function loadUsers() {
+  const [modalOpen, setModalOpen] = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [companyId, setCompanyId] = useState('')
+  const [teamId, setTeamId] = useState('')
+  const [roleId, setRoleId] = useState('')
+  const [status, setStatus] = useState<AdminUserStatus>('ACTIVE')
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  async function loadData() {
     setLoading(true)
     setError('')
 
     try {
-      const result = await getUsers()
-      setUsers(result)
+      const [userResult, companyResult, teamResult, roleResult] = await Promise.all([
+        getUsers(),
+        getCompanies(),
+        getTeams(),
+        getRoles(),
+      ])
+
+      setUsers(userResult)
+      setCompanies(companyResult)
+      setTeams(teamResult)
+      setRoles(roleResult)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载用户列表失败')
     } finally {
@@ -82,23 +128,90 @@ export function UserPage() {
   }
 
   useEffect(() => {
-    loadUsers()
+    loadData()
   }, [])
+
+  function openCreateModal() {
+    setUsername('')
+    setPassword('')
+    setDisplayName('')
+    setCompanyId(companies[0]?.id || '')
+    setTeamId('')
+    setRoleId(roles[0]?.id || '')
+    setStatus('ACTIVE')
+    setFormError('')
+    setModalOpen(true)
+  }
+
+  function closeCreateModal() {
+    if (saving) {
+      return
+    }
+
+    setModalOpen(false)
+  }
+
+  async function handleCreateUser() {
+    const trimmedUsername = username.trim()
+    const trimmedPassword = password.trim()
+    const trimmedDisplayName = displayName.trim()
+
+    if (!trimmedUsername) {
+      setFormError('请输入账号')
+      return
+    }
+
+    if (!trimmedPassword) {
+      setFormError('请输入密码')
+      return
+    }
+
+    if (trimmedPassword.length < 6) {
+      setFormError('密码至少 6 位')
+      return
+    }
+
+    setSaving(true)
+    setFormError('')
+
+    try {
+      await createUser({
+        username: trimmedUsername,
+        password: trimmedPassword,
+        displayName: trimmedDisplayName || undefined,
+        companyId: companyId || undefined,
+        teamId: teamId || undefined,
+        roleId: roleId || undefined,
+        status,
+      })
+
+      setModalOpen(false)
+      await loadData()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : '新增用户失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const selectableTeams = companyId
+    ? teams.filter((team) => team.companyId === companyId)
+    : teams
 
   return (
     <div className="manage-page">
       <div className="page-header">
         <div>
           <h2>用户管理</h2>
-          <p>管理后台账号、员工账号、所属公司团队和角色，当前页面已经接入后端用户列表接口。</p>
+          <p>管理后台账号、员工账号、所属公司团队和角色，当前页面已经接入用户列表和新增接口。</p>
         </div>
 
         <div className="page-actions">
-          <button className="secondary-button" type="button" onClick={loadUsers}>
+          <button className="secondary-button" type="button" onClick={loadData}>
             刷新
           </button>
 
-          <button className="primary-button" type="button">
+          <button className="primary-button" type="button" onClick={openCreateModal}>
             新增用户
           </button>
         </div>
@@ -140,9 +253,9 @@ export function UserPage() {
                 <tr key={user.id}>
                   <td>{user.username}</td>
                   <td>{getDisplayName(user)}</td>
-                  <td>{getCompanyName(user)}</td>
-                  <td>{getTeamName(user)}</td>
-                  <td>{getRoleName(user)}</td>
+                  <td>{getCompanyName(user, companies)}</td>
+                  <td>{getTeamName(user, teams)}</td>
+                  <td>{getRoleName(user, roles)}</td>
                   <td>
                     <span className={`status-badge ${getStatusClass(user.status)}`}>
                       {getStatusText(user.status)}
@@ -164,6 +277,136 @@ export function UserPage() {
           </tbody>
         </table>
       </section>
+
+      {modalOpen ? (
+        <div className="modal-mask">
+          <div className="modal-card">
+            <div className="modal-header">
+              <div>
+                <h3>新增用户</h3>
+                <p>创建一个新的后台或员工账号</p>
+              </div>
+
+              <button className="modal-close" type="button" onClick={closeCreateModal}>
+                ×
+              </button>
+            </div>
+
+            <div className="modal-form">
+              <label>
+                <span>账号</span>
+                <input
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="例如：user001"
+                  autoComplete="off"
+                />
+              </label>
+
+              <label>
+                <span>密码</span>
+                <input
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="至少 6 位"
+                  type="password"
+                  autoComplete="new-password"
+                />
+              </label>
+
+              <label>
+                <span>姓名</span>
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="例如：张三"
+                />
+              </label>
+
+              <label>
+                <span>所属公司</span>
+                <select
+                  value={companyId}
+                  onChange={(event) => {
+                    setCompanyId(event.target.value)
+                    setTeamId('')
+                  }}
+                >
+                  <option value="">不选择公司</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>所属团队</span>
+                <select
+                  value={teamId}
+                  onChange={(event) => setTeamId(event.target.value)}
+                >
+                  <option value="">不选择团队</option>
+                  {selectableTeams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>角色</span>
+                <select
+                  value={roleId}
+                  onChange={(event) => setRoleId(event.target.value)}
+                >
+                  <option value="">不选择角色</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>状态</span>
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value as AdminUserStatus)}
+                >
+                  <option value="ACTIVE">启用</option>
+                  <option value="DISABLED">停用</option>
+                </select>
+              </label>
+
+              {formError ? <div className="form-error">{formError}</div> : null}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={closeCreateModal}
+                disabled={saving}
+              >
+                取消
+              </button>
+
+              <button
+                className="primary-button"
+                type="button"
+                onClick={handleCreateUser}
+                disabled={saving}
+              >
+                {saving ? '保存中...' : '确认新增'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

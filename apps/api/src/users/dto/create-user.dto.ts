@@ -1,27 +1,30 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+﻿import { IsIn, IsOptional, IsString, MinLength } from 'class-validator'
 
 export class CreateUserDto {
   @IsString()
-  @IsNotEmpty()
-  username: string;
+  username: string
+
+  @IsString()
+  @MinLength(6)
+  password: string
 
   @IsOptional()
   @IsString()
-  displayName?: string;
+  displayName?: string
 
   @IsOptional()
   @IsString()
-  companyId?: string;
+  companyId?: string
 
   @IsOptional()
   @IsString()
-  teamId?: string;
+  teamId?: string
 
   @IsOptional()
   @IsString()
-  roleId?: string;
+  roleId?: string
 
   @IsOptional()
-  @IsString()
-  password?: string;
+  @IsIn(['ACTIVE', 'DISABLED'])
+  status?: 'ACTIVE' | 'DISABLED'
 }

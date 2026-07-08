@@ -269,3 +269,20 @@ export async function getUsers() {
   const response = await request<ListResponse<AdminUser>>('/users')
   return normalizeList(response)
 }
+
+export type CreateUserPayload = {
+  username: string
+  password: string
+  displayName?: string
+  companyId?: string
+  teamId?: string
+  roleId?: string
+  status?: AdminUserStatus
+}
+
+export async function createUser(payload: CreateUserPayload) {
+  return request<AdminUser>('/users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
