@@ -233,3 +233,39 @@ export async function updateRole(id: string, payload: UpdateRolePayload) {
     body: JSON.stringify(payload),
   })
 }
+
+export type AdminUserStatus = 'ACTIVE' | 'DISABLED'
+
+export type AdminUser = {
+  id: string
+  username: string
+  displayName?: string | null
+  name?: string | null
+  phone?: string | null
+  email?: string | null
+  status?: AdminUserStatus
+  companyId?: string | null
+  teamId?: string | null
+  roleId?: string | null
+  company?: {
+    id: string
+    name: string
+    code?: string
+  } | null
+  team?: {
+    id: string
+    name: string
+  } | null
+  role?: {
+    id: string
+    name: string
+    code?: string
+  } | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function getUsers() {
+  const response = await request<ListResponse<AdminUser>>('/users')
+  return normalizeList(response)
+}
