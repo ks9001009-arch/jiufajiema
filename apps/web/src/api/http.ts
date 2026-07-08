@@ -169,3 +169,15 @@ export async function getTeams() {
   const response = await request<ListResponse<Team>>('/teams')
   return normalizeList(response)
 }
+
+export type CreateTeamPayload = {
+  name: string
+  companyId: string
+}
+
+export async function createTeam(payload: CreateTeamPayload) {
+  return request<Team>('/teams', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}

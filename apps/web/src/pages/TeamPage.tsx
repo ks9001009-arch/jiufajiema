@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
-import { getTeams } from '../api/http'
-import type { Team } from '../api/http'
+import { createTeam, getCompanies, getTeams } from '../api/http'
+import type { Company, Team } from '../api/http'
 
 function formatDate(value?: string) {
   if (!value) {
@@ -22,22 +22,43 @@ function formatDate(value?: string) {
   })
 }
 
-function getCompanyName(team: Team) {
-  return team.company?.name || team.companyId || '-'
+function getCompanyName(team: Team, companies: Company[]) {
+  if (team.company?.name) {
+    return team.company.name
+  }
+
+  const company = companies.find((item) => item.id === team.companyId)
+  return company?.name || team.companyId || '-'
 }
 
 export function TeamPage() {
   const [teams, setTeams] = useState<Team[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function loadTeams() {
+  const [modalOpen, setModalOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [companyId, setCompanyId] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  async function loadData() {
     setLoading(true)
     setError('')
 
     try {
-      const result = await getTeams()
-      setTeams(result)
+      const [teamResult, companyResult] = await Promise.all([
+        getTeams(),
+        getCompanies(),
+      ])
+
+      setTeams(teamResult)
+      setCompanies(companyResult)
+
+      if (!companyId && companyResult.length > 0) {
+        setCompanyId(companyResult[0].id)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载团队列表失败')
     } finally {
@@ -46,23 +67,69 @@ export function TeamPage() {
   }
 
   useEffect(() => {
-    loadTeams()
+    loadData()
   }, [])
+
+  function openCreateModal() {
+    setName('')
+    setCompanyId(companies[0]?.id || '')
+    setFormError('')
+    setModalOpen(true)
+  }
+
+  function closeCreateModal() {
+    if (saving) {
+      return
+    }
+
+    setModalOpen(false)
+  }
+
+  async function handleCreateTeam() {
+    const trimmedName = name.trim()
+
+    if (!trimmedName) {
+      setFormError('请输入团队名称')
+      return
+    }
+
+    if (!companyId) {
+      setFormError('请选择所属公司')
+      return
+    }
+
+    setSaving(true)
+    setFormError('')
+
+    try {
+      await createTeam({
+        name: trimmedName,
+        companyId,
+      })
+
+      setModalOpen(false)
+      await loadData()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : '新增团队失败')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="manage-page">
       <div className="page-header">
         <div>
           <h2>团队管理</h2>
-          <p>管理公司下的业务团队，当前页面已经接入后端团队列表接口。</p>
+          <p>管理公司下的业务团队，当前页面已经接入团队列表和新增接口。</p>
         </div>
 
         <div className="page-actions">
-          <button className="secondary-button" type="button" onClick={loadTeams}>
+          <button className="secondary-button" type="button" onClick={loadData}>
             刷新
           </button>
 
-          <button className="primary-button" type="button">
+          <button className="primary-button" type="button" onClick={openCreateModal}>
             新增团队
           </button>
         </div>
@@ -99,7 +166,7 @@ export function TeamPage() {
               teams.map((team) => (
                 <tr key={team.id}>
                   <td>{team.name}</td>
-                  <td>{getCompanyName(team)}</td>
+                  <td>{getCompanyName(team, companies)}</td>
                   <td>{formatDate(team.createdAt)}</td>
                   <td>
                     <button className="text-button" type="button">
@@ -116,6 +183,74 @@ export function TeamPage() {
           </tbody>
         </table>
       </section>
+
+      {modalOpen ? (
+        <div className="modal-mask">
+          <div className="modal-card">
+            <div className="modal-header">
+              <div>
+                <h3>新增团队</h3>
+                <p>创建一个新的业务团队</p>
+              </div>
+
+              <button className="modal-close" type="button" onClick={closeCreateModal}>
+                ×
+              </button>
+            </div>
+
+            <div className="modal-form">
+              <label>
+                <span>所属公司</span>
+                <select
+                  value={companyId}
+                  onChange={(event) => setCompanyId(event.target.value)}
+                >
+                  {companies.length > 0 ? (
+                    companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">请先创建公司</option>
+                  )}
+                </select>
+              </label>
+
+              <label>
+                <span>团队名称</span>
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="例如：运营一组"
+                />
+              </label>
+
+              {formError ? <div className="form-error">{formError}</div> : null}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={closeCreateModal}
+                disabled={saving}
+              >
+                取消
+              </button>
+
+              <button
+                className="primary-button"
+                type="button"
+                onClick={handleCreateTeam}
+                disabled={saving}
+              >
+                {saving ? '保存中...' : '确认新增'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
