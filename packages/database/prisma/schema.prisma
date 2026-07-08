@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CompanyStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model Company {
+  id        String        @id @default(uuid())
+  name      String
+  code      String        @unique
+  status    CompanyStatus @default(ACTIVE)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  teams     Team[]
+  users     User[]
+  auditLogs AuditLog[]
+}
+
+model Team {
+  id        String   @id @default(uuid())
+  name      String
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+}
+
+model User {
+  id           String     @id @default(uuid())
+  username     String     @unique
+  passwordHash String
+  displayName  String?
+  status       UserStatus @default(ACTIVE)
+  companyId    String?
+  company      Company?   @relation(fields: [companyId], references: [id])
+  teamId       String?
+  team         Team?      @relation(fields: [teamId], references: [id])
+  roleId       String?
+  role         Role?      @relation(fields: [roleId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String?
+  actorUser   User?    @relation(fields: [actorUserId], references: [id])
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id])
+  action      String
+  targetType  String?
+  targetId    String?
+  beforeData  Json?
+  afterData   Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+}

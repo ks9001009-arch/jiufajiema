@@ -1,0 +1,16 @@
+{
+  "name": "@jiufa/database",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0"
+  },
+  "devDependencies": {
+    "prisma": "5.22.0"
+  }
+}
