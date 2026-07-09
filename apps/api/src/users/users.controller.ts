@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Get,
@@ -14,6 +14,7 @@ import { JwtPayload } from '../auth/jwt-payload';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('users')
@@ -38,6 +39,14 @@ export class UsersController {
     return this.usersService.create(dto, user.sub);
   }
 
+  @Patch(':id/reset-password')
+  resetPassword(
+    @Param('id') id: string,
+    @Body() dto: ResetUserPasswordDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.usersService.resetPassword(id, dto.password, user.sub);
+  }
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -47,3 +56,4 @@ export class UsersController {
     return this.usersService.update(id, dto, user.sub);
   }
 }
+

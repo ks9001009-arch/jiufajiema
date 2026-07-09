@@ -303,6 +303,13 @@ export async function updateUser(id: string, payload: UpdateUserPayload) {
   })
 }
 
+
+export async function resetUserPassword(id: string, password: string) {
+  return request<AdminUser>(`/users/${id}/reset-password`, {
+    method: 'PATCH',
+    body: JSON.stringify({ password }),
+  })
+}
 export type AuditLog = {
   id: string
   actorUserId?: string | null
@@ -330,3 +337,4 @@ export async function getAuditLogs() {
   const response = await request<ListResponse<AuditLog>>('/audit-logs')
   return normalizeList(response)
 }
+

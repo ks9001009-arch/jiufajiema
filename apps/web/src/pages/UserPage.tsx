@@ -6,6 +6,7 @@ import {
   getTeams,
   getUsers,
   updateUser,
+  resetUserPassword,
 } from '../api/http'
 import type {
   AdminUser,
@@ -105,6 +106,11 @@ export function UserPage() {
   const [status, setStatus] = useState<AdminUserStatus>('ACTIVE')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [resetModalOpen, setResetModalOpen] = useState(false)
+  const [resetUser, setResetUser] = useState<AdminUser | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetSaving, setResetSaving] = useState(false)
+  const [resetError, setResetError] = useState('')
 
   const isEditing = Boolean(editingUser)
 
@@ -169,6 +175,54 @@ export function UserPage() {
     setModalOpen(false)
   }
 
+
+  function openResetPasswordModal(user: AdminUser) {
+    setResetUser(user)
+    setResetPassword('')
+    setResetError('')
+    setResetModalOpen(true)
+  }
+
+  function closeResetPasswordModal() {
+    if (resetSaving) {
+      return
+    }
+
+    setResetModalOpen(false)
+  }
+
+  async function handleResetPassword() {
+    if (!resetUser) {
+      return
+    }
+
+    const trimmedPassword = resetPassword.trim()
+
+    if (!trimmedPassword) {
+      setResetError('请输入新密码')
+      return
+    }
+
+    if (trimmedPassword.length < 6) {
+      setResetError('密码至少 6 位')
+      return
+    }
+
+    setResetSaving(true)
+    setResetError('')
+
+    try {
+      await resetUserPassword(resetUser.id, trimmedPassword)
+      setResetModalOpen(false)
+      setResetUser(null)
+      setResetPassword('')
+      await loadData()
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : '重置密码失败')
+    } finally {
+      setResetSaving(false)
+    }
+  }
   async function handleSubmitUser() {
     const trimmedUsername = username.trim()
     const trimmedPassword = password.trim()
@@ -299,6 +353,14 @@ export function UserPage() {
                     >
                       编辑
                     </button>
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => openResetPasswordModal(user)}
+                  style={{ marginLeft: 12 }}
+                >
+                  重置密码
+                </button>
                   </td>
                 </tr>
               ))
@@ -311,6 +373,59 @@ export function UserPage() {
         </table>
       </section>
 
+      {resetModalOpen ? (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-header">
+              <div>
+                <h3>重置密码</h3>
+                <p>
+                  为用户「{resetUser?.username}」设置新的登录密码
+                </p>
+              </div>
+
+              <button className="modal-close" type="button" onClick={closeResetPasswordModal}>
+                ×
+              </button>
+            </div>
+
+            <div className="modal-form">
+              <label>
+                <span>新密码</span>
+                <input
+                  value={resetPassword}
+                  onChange={(event) => setResetPassword(event.target.value)}
+                  placeholder="至少 6 位"
+                  type="password"
+                  autoComplete="new-password"
+                />
+              </label>
+
+              {resetError ? <div className="form-error">{resetError}</div> : null}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={closeResetPasswordModal}
+                disabled={resetSaving}
+              >
+                取消
+              </button>
+
+              <button
+                className="primary-button"
+                type="button"
+                onClick={handleResetPassword}
+                disabled={resetSaving}
+              >
+                {resetSaving ? '重置中...' : '确认重置'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {modalOpen ? (
         <div className="modal-mask">
           <div className="modal-card">
@@ -445,3 +560,7 @@ export function UserPage() {
     </div>
   )
 }
+
+
+
+

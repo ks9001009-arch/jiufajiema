@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   ConflictException,
   Injectable,
@@ -122,6 +122,35 @@ export class UsersService {
     return this.toPublicUser(user);
   }
 
+
+  async resetPassword(id: string, password: string, actorUserId: string) {
+    const existing = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!existing) {
+      throw new NotFoundException(`User with id "${id}" not found`);
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: { passwordHash },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        action: 'user.resetPassword',
+        targetType: 'User',
+        targetId: user.id,
+        actorUserId,
+        companyId: user.companyId,
+        beforeData: this.toAuditData(existing),
+        afterData: this.toAuditData(user),
+      },
+    });
+
+    return this.toPublicUser(user);
+  }
   private async validateCreateRelations(dto: CreateUserDto) {
     if (dto.companyId) {
       await this.assertCompanyExists(dto.companyId);
@@ -233,3 +262,4 @@ export class UsersService {
     );
   }
 }
+
