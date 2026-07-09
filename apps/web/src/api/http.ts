@@ -4,24 +4,30 @@
 export type CurrentUser = {
   id: string | number
   username?: string
+  displayName?: string | null
   name?: string
   phone?: string
   email?: string
+  status?: string
+  companyId?: string | null
+  teamId?: string | null
+  roleId?: string | null
   role?: {
     id?: string | number
     name?: string
     code?: string
+    permissions?: string[]
   } | null
   company?: {
     id?: string | number
     name?: string
+    code?: string
   } | null
   team?: {
     id?: string | number
     name?: string
   } | null
 }
-
 export type LoginResponse = {
   accessToken?: string
   access_token?: string
@@ -340,5 +346,7 @@ export async function getAuditLogs() {
   const response = await request<ListResponse<AuditLog>>('/audit-logs')
   return normalizeList(response)
 }
+
+
 
 

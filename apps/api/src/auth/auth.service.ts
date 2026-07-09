@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+﻿import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
@@ -15,6 +15,21 @@ type UserRecord = {
   companyId: string | null;
   teamId: string | null;
   roleId: string | null;
+  company?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
+  team?: {
+    id: string;
+    name: string;
+  } | null;
+  role?: {
+    id: string;
+    name: string;
+    code: string;
+    permissions: string[];
+  } | null;
 };
 
 @Injectable()
@@ -27,6 +42,11 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { username: dto.username },
+      include: {
+        company: true,
+        team: true,
+        role: true,
+      },
     });
 
     if (!user) {
@@ -65,7 +85,14 @@ export class AuthService {
   }
 
   async getMe(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        company: true,
+        team: true,
+        role: true,
+      },
+    });
 
     if (!user) {
       throw new UnauthorizedException();
@@ -83,6 +110,28 @@ export class AuthService {
       companyId: user.companyId,
       teamId: user.teamId,
       roleId: user.roleId,
+      company: user.company
+        ? {
+            id: user.company.id,
+            name: user.company.name,
+            code: user.company.code,
+          }
+        : null,
+      team: user.team
+        ? {
+            id: user.team.id,
+            name: user.team.name,
+          }
+        : null,
+      role: user.role
+        ? {
+            id: user.role.id,
+            name: user.role.name,
+            code: user.role.code,
+            permissions: user.role.permissions,
+          }
+        : null,
     };
   }
 }
+
