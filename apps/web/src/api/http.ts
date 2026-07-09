@@ -199,6 +199,7 @@ export type Role = {
   name: string
   code: string
   description?: string | null
+  permissions: string[]
   createdAt?: string
   updatedAt?: string
 }
@@ -212,6 +213,7 @@ export type CreateRolePayload = {
   name: string
   code: string
   description?: string
+  permissions?: string[]
 }
 
 export async function createRole(payload: CreateRolePayload) {
@@ -225,6 +227,7 @@ export type UpdateRolePayload = {
   name?: string
   code?: string
   description?: string
+  permissions?: string[]
 }
 
 export async function updateRole(id: string, payload: UpdateRolePayload) {
@@ -337,4 +340,5 @@ export async function getAuditLogs() {
   const response = await request<ListResponse<AuditLog>>('/audit-logs')
   return normalizeList(response)
 }
+
 

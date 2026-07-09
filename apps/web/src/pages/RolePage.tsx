@@ -22,6 +22,51 @@ function formatDate(value?: string) {
   })
 }
 
+
+const PERMISSION_GROUPS = [
+  {
+    title: '首页与日志',
+    items: [
+      { key: 'dashboard.view', label: '查看后台首页' },
+      { key: 'auditLog.view', label: '查看操作日志' },
+    ],
+  },
+  {
+    title: '公司管理',
+    items: [
+      { key: 'company.view', label: '查看公司' },
+      { key: 'company.create', label: '新增公司' },
+      { key: 'company.update', label: '编辑公司' },
+      { key: 'company.toggleStatus', label: '启用/停用公司' },
+    ],
+  },
+  {
+    title: '团队管理',
+    items: [
+      { key: 'team.view', label: '查看团队' },
+      { key: 'team.create', label: '新增团队' },
+      { key: 'team.update', label: '编辑团队' },
+    ],
+  },
+  {
+    title: '角色管理',
+    items: [
+      { key: 'role.view', label: '查看角色' },
+      { key: 'role.create', label: '新增角色' },
+      { key: 'role.update', label: '编辑角色' },
+    ],
+  },
+  {
+    title: '用户管理',
+    items: [
+      { key: 'user.view', label: '查看用户' },
+      { key: 'user.create', label: '新增用户' },
+      { key: 'user.update', label: '编辑用户' },
+      { key: 'user.toggleStatus', label: '启用/停用用户' },
+      { key: 'user.resetPassword', label: '重置用户密码' },
+    ],
+  },
+]
 export function RolePage() {
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(false)
@@ -32,6 +77,7 @@ export function RolePage() {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [description, setDescription] = useState('')
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -60,6 +106,7 @@ export function RolePage() {
     setName('')
     setCode('')
     setDescription('')
+    setSelectedPermissions([])
     setFormError('')
     setModalOpen(true)
   }
@@ -69,6 +116,7 @@ export function RolePage() {
     setName(role.name)
     setCode(role.code)
     setDescription(role.description || '')
+    setSelectedPermissions(role.permissions ?? [])
     setFormError('')
     setModalOpen(true)
   }
@@ -81,6 +129,14 @@ export function RolePage() {
     setModalOpen(false)
   }
 
+
+  function togglePermission(permission: string) {
+    setSelectedPermissions((current) =>
+      current.includes(permission)
+        ? current.filter((item) => item !== permission)
+        : [...current, permission],
+    )
+  }
   async function handleSubmitRole() {
     const trimmedName = name.trim()
     const trimmedCode = code.trim()
@@ -105,12 +161,14 @@ export function RolePage() {
           name: trimmedName,
           code: trimmedCode,
           description: trimmedDescription || undefined,
+        permissions: selectedPermissions,
         })
       } else {
         await createRole({
           name: trimmedName,
           code: trimmedCode,
           description: trimmedDescription || undefined,
+        permissions: selectedPermissions,
         })
       }
 
@@ -239,6 +297,46 @@ export function RolePage() {
                   rows={4}
                 />
               </label>
+              <div className="form-field">
+                <span>权限配置</span>
+                <div
+                  style={{
+                    display: 'grid',
+                    gap: 12,
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 8,
+                    padding: 12,
+                    maxHeight: 260,
+                    overflow: 'auto',
+                  }}
+                >
+                  {PERMISSION_GROUPS.map((group) => (
+                    <div key={group.title}>
+                      <div style={{ fontWeight: 600, marginBottom: 8 }}>{group.title}</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+                        {group.items.map((item) => (
+                          <label
+                            key={item.key}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              fontSize: 13,
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedPermissions.includes(item.key)}
+                              onChange={() => togglePermission(item.key)}
+                            />
+                            {item.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               {formError ? <div className="form-error">{formError}</div> : null}
             </div>
@@ -268,3 +366,4 @@ export function RolePage() {
     </div>
   )
 }
+

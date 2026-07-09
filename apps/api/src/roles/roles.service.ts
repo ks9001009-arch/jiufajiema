@@ -1,4 +1,4 @@
-import {
+﻿import {
   ConflictException,
   Injectable,
   NotFoundException,
@@ -12,6 +12,7 @@ type RoleRecord = {
   name: string;
   code: string;
   description: string | null;
+  permissions: string[];
   createdAt: Date;
   updatedAt: Date;
 };
@@ -43,6 +44,7 @@ export class RolesService {
           name: dto.name,
           code: dto.code,
           description: dto.description,
+        permissions: dto.permissions ?? [],
         },
       });
 
@@ -80,6 +82,7 @@ export class RolesService {
       data: {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
+      ...(dto.permissions !== undefined ? { permissions: dto.permissions } : {}),
       },
     });
 
@@ -103,6 +106,7 @@ export class RolesService {
       name: role.name,
       code: role.code,
       description: role.description,
+      permissions: role.permissions,
       createdAt: role.createdAt.toISOString(),
       updatedAt: role.updatedAt.toISOString(),
     };
@@ -117,3 +121,4 @@ export class RolesService {
     );
   }
 }
+
