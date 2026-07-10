@@ -9,18 +9,11 @@ import {
 import { AdminLayout, type AdminPageKey } from './layouts/AdminLayout'
 import { AuditLogPage } from './pages/AuditLogPage'
 import { CompanyPage } from './pages/CompanyPage'
+import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { RolePage } from './pages/RolePage'
 import { TeamPage } from './pages/TeamPage'
 import { UserPage } from './pages/UserPage'
-const PAGE_PERMISSIONS: Record<AdminPageKey, string> = {
-  dashboard: 'dashboard.view',
-  companies: 'company.view',
-  teams: 'team.view',
-  roles: 'role.view',
-  users: 'user.view',
-  auditLogs: 'auditLog.view',
-}
 
 function App() {
   const [token, setToken] = useState<string | null>(() => getAccessToken())
@@ -61,31 +54,6 @@ function App() {
       cancelled = true
     }
   }, [token])
-useEffect(() => {
-  if (!user) {
-    return
-  }
-
-  const permissions = user.role?.permissions ?? []
-
-  const currentPermission = PAGE_PERMISSIONS[activePage]
-
-  if (
-    currentPermission &&
-    permissions.length > 0 &&
-    !permissions.includes(currentPermission)
-  ) {
-    const firstAvailablePage = (
-      Object.keys(PAGE_PERMISSIONS) as AdminPageKey[]
-    ).find(page =>
-      permissions.includes(PAGE_PERMISSIONS[page])
-    )
-
-    if (firstAvailablePage) {
-      setActivePage(firstAvailablePage)
-    }
-  }
-}, [activePage, user])
 
   function handleLogin(newToken: string) {
     setToken(newToken)
@@ -113,7 +81,7 @@ useEffect(() => {
         return <AuditLogPage />
       case 'dashboard':
       default:
-  return <div>暂无可访问页面</div>
+        return <DashboardPage user={user} />
     }
   }
 
