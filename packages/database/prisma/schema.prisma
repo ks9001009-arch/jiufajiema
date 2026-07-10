@@ -28,6 +28,11 @@ model Company {
   teams     Team[]
   users     User[]
   auditLogs AuditLog[]
+
+  services       Service[]
+  providers      Provider[]
+  phoneResources PhoneResource[]
+  orders         Order[]
 }
 
 model Team {
@@ -69,6 +74,7 @@ model User {
   updatedAt    DateTime   @updatedAt
 
   auditLogs AuditLog[]
+  orders    Order[]
 }
 
 model AuditLog {
@@ -87,3 +93,153 @@ model AuditLog {
   createdAt   DateTime @default(now())
 }
 
+enum ServiceStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ProviderStatus {
+  ACTIVE
+  DISABLED
+}
+
+model PhoneResource {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id])
+
+  phone String
+
+  country String?
+
+  status PhoneStatus @default(AVAILABLE)
+
+  cost Decimal @db.Decimal(10, 4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([status])
+  @@index([providerId])
+}
+
+enum PhoneStatus {
+  AVAILABLE
+  LOCKED
+  USED
+  EXPIRED
+  DISABLED
+}
+
+enum OrderStatus {
+  PENDING
+  WAIT_SMS
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum SmsStatus {
+  RECEIVED
+  FAILED
+}
+
+model Service {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  name String
+  code String
+
+  description String?
+
+  status ServiceStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  providers Provider[]
+  orders    Order[]
+
+  @@unique([companyId, code])
+}
+
+model Provider {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  name String
+  code String
+
+  adapter String
+
+  config Json?
+
+  status ProviderStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  services       Service[]
+  phoneResources PhoneResource[]
+  orders         Order[]
+
+  @@unique([companyId, code])
+}
+
+model Order {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id])
+
+  phoneResourceId String
+  phoneResource   PhoneResource @relation(fields: [phoneResourceId], references: [id])
+
+  status OrderStatus @default(PENDING)
+
+  amount Decimal @db.Decimal(10, 4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sms Sms[]
+}
+
+model Sms {
+  id String @id @default(uuid())
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  code String?
+
+  content String?
+
+  status SmsStatus @default(RECEIVED)
+
+  receivedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
