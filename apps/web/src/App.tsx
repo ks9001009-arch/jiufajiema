@@ -14,12 +14,12 @@ import { RolePage } from './pages/RolePage'
 import { TeamPage } from './pages/TeamPage'
 import { UserPage } from './pages/UserPage'
 const PAGE_PERMISSIONS: Record<AdminPageKey, string> = {
-  dashboard: 'dashboard.view',
-  companies: 'company.view',
-  teams: 'team.view',
-  roles: 'role.view',
-  users: 'user.view',
-  auditLogs: 'auditLog.view',
+  dashboard: 'user.read',
+  companies: 'company.read',
+  teams: 'team.read',
+  roles: 'role.read',
+  users: 'user.read',
+  auditLogs: 'audit.read',
 }
 
 function App() {
@@ -40,10 +40,11 @@ function App() {
 
     getMe()
       .then((currentUser) => {
-        if (!cancelled) {
-          setUser(currentUser)
-        }
-      })
+
+      if (!cancelled) {
+       setUser(currentUser)
+      }
+   })
       .catch(() => {
         clearAccessToken()
         if (!cancelled) {
@@ -112,8 +113,14 @@ useEffect(() => {
       case 'auditLogs':
         return <AuditLogPage />
       case 'dashboard':
-      default:
-  return <div>暂无可访问页面</div>
+  return (
+    <section>
+      <h1>后台首页</h1>
+      <p>欢迎进入玖发接码平台管理后台。</p>
+    </section>
+  )
+default:
+  return <div>页面不存在</div>  
     }
   }
 

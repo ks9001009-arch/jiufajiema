@@ -24,12 +24,12 @@ type AdminMenuItem = {
 }
 
 const menus: AdminMenuItem[] = [
-  { key: 'dashboard', label: '后台首页', permission: 'dashboard.view' },
-  { key: 'companies', label: '公司管理', permission: 'company.view' },
-  { key: 'teams', label: '团队管理', permission: 'team.view' },
-  { key: 'roles', label: '角色管理', permission: 'role.view' },
-  { key: 'users', label: '用户管理', permission: 'user.view' },
-  { key: 'auditLogs', label: '操作日志', permission: 'auditLog.view' },
+  { key: 'dashboard', label: '后台首页', permission: 'user.read' },
+  { key: 'companies', label: '公司管理', permission: 'company.read' },
+  { key: 'teams', label: '团队管理', permission: 'team.read' },
+  { key: 'roles', label: '角色管理', permission: 'role.read' },
+  { key: 'users', label: '用户管理', permission: 'user.read' },
+  { key: 'auditLogs', label: '操作日志', permission: 'audit.read' },
 ]
 
 function getRolePermissions(user: CurrentUser | null) {
