@@ -158,6 +158,61 @@ export async function updateCompany(id: string, payload: UpdateCompanyPayload) {
   })
 }
 
+export type ServiceStatus = 'ACTIVE' | 'DISABLED'
+
+export type Service = {
+  id: string
+  companyId: string
+  name: string
+  code: string
+  description?: string | null
+  status: ServiceStatus
+  company?: {
+    id: string
+    name: string
+    code?: string
+  } | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function getServices() {
+  const response = await request<ListResponse<Service>>('/services')
+  return normalizeList(response)
+}
+
+export async function getService(id: string) {
+  return request<Service>(`/services/${id}`)
+}
+
+export type CreateServicePayload = {
+  companyId: string
+  name: string
+  code: string
+  description?: string
+}
+
+export async function createService(payload: CreateServicePayload) {
+  return request<Service>('/services', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export type UpdateServicePayload = {
+  name?: string
+  code?: string
+  description?: string
+  status?: ServiceStatus
+}
+
+export async function updateService(id: string, payload: UpdateServicePayload) {
+  return request<Service>(`/services/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
 export type Team = {
   id: string
   name: string
