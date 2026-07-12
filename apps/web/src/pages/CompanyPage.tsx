@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createCompany, getCompanies, updateCompany } from '../api/http'
 import type { Company, CompanyStatus } from '../api/http'
 

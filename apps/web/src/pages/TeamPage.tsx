@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createTeam, getCompanies, getTeams, updateTeam } from '../api/http'
 import type { Company, Team } from '../api/http'
 

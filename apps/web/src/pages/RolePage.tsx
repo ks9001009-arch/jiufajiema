@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createRole, getRoles, updateRole } from '../api/http'
 import type { Role } from '../api/http'
 

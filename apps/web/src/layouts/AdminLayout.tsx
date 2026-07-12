@@ -1,4 +1,4 @@
-﻿import type { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { CurrentUser } from '../api/http'
 
 export type AdminPageKey =
@@ -23,14 +23,37 @@ type AdminMenuItem = {
   permission: string
 }
 
-const menus: AdminMenuItem[] = [
-  { key: 'dashboard', label: '后台首页', permission: 'user.read' },
-  { key: 'companies', label: '公司管理', permission: 'company.read' },
-  { key: 'teams', label: '团队管理', permission: 'team.read' },
-  { key: 'roles', label: '角色管理', permission: 'role.read' },
-  { key: 'users', label: '用户管理', permission: 'user.read' },
-  { key: 'auditLogs', label: '操作日志', permission: 'audit.read' },
+type AdminMenuGroup = {
+  title: string
+  items: AdminMenuItem[]
+}
+
+const menuGroups: AdminMenuGroup[] = [
+  {
+    title: '概览',
+    items: [{ key: 'dashboard', label: '后台首页', permission: 'user.read' }],
+  },
+  {
+    title: '系统管理',
+    items: [
+      { key: 'companies', label: '公司管理', permission: 'company.read' },
+      { key: 'teams', label: '团队管理', permission: 'team.read' },
+      { key: 'roles', label: '角色管理', permission: 'role.read' },
+      { key: 'users', label: '用户管理', permission: 'user.read' },
+    ],
+  },
+  {
+    title: '系统审计',
+    items: [{ key: 'auditLogs', label: '操作日志', permission: 'audit.read' }],
+  },
 ]
+
+const groupTitleStyle = {
+  margin: '10px 8px 2px',
+  color: '#98a2b3',
+  fontSize: 12,
+  lineHeight: '16px',
+} as const
 
 function getRolePermissions(user: CurrentUser | null) {
   return Array.isArray(user?.role?.permissions) ? user.role.permissions : []
@@ -55,7 +78,12 @@ export function AdminLayout({
   children,
 }: AdminLayoutProps) {
   const displayName = user?.displayName || user?.name || user?.username || user?.phone || '管理员'
-  const visibleMenus = menus.filter((menu) => canViewMenu(user, menu.permission))
+  const visibleGroups = menuGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((menu) => canViewMenu(user, menu.permission)),
+    }))
+    .filter((group) => group.items.length > 0)
 
   return (
     <div className="admin-shell">
@@ -69,15 +97,20 @@ export function AdminLayout({
         </div>
 
         <nav className="sidebar-menu">
-          {visibleMenus.map((menu) => (
-            <button
-              key={menu.key}
-              type="button"
-              className={activePage === menu.key ? 'active' : ''}
-              onClick={() => onPageChange(menu.key)}
-            >
-              {menu.label}
-            </button>
+          {visibleGroups.map((group) => (
+            <div key={group.title} style={{ display: 'grid', gap: 8 }}>
+              <div style={groupTitleStyle}>{group.title}</div>
+              {group.items.map((menu) => (
+                <button
+                  key={menu.key}
+                  type="button"
+                  className={activePage === menu.key ? 'active' : ''}
+                  onClick={() => onPageChange(menu.key)}
+                >
+                  {menu.label}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
       </aside>

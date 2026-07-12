@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './index.css'
 import {
   clearAccessToken,
@@ -9,6 +9,7 @@ import {
 import { AdminLayout, type AdminPageKey } from './layouts/AdminLayout'
 import { AuditLogPage } from './pages/AuditLogPage'
 import { CompanyPage } from './pages/CompanyPage'
+import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { RolePage } from './pages/RolePage'
 import { TeamPage } from './pages/TeamPage'
@@ -113,14 +114,9 @@ useEffect(() => {
       case 'auditLogs':
         return <AuditLogPage />
       case 'dashboard':
-  return (
-    <section>
-      <h1>后台首页</h1>
-      <p>欢迎进入玖发接码平台管理后台。</p>
-    </section>
-  )
-default:
-  return <div>页面不存在</div>  
+        return <DashboardPage user={user} />
+      default:
+        return <div>页面不存在</div>
     }
   }
 
