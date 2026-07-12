@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createTeam, getCompanies, getTeams, updateTeam } from '../api/http'
 import type { Company, Team } from '../api/http'
+import { PageHeader } from '../components/PageHeader'
 
 function formatDate(value?: string) {
   if (!value) {
@@ -137,22 +138,21 @@ export function TeamPage() {
 
   return (
     <div className="manage-page">
-      <div className="page-header">
-        <div>
-          <h2>团队管理</h2>
-          <p>管理公司下的业务团队，当前页面已经接入列表、新增和编辑接口。</p>
-        </div>
+      <PageHeader
+        title="团队管理"
+        subtitle="管理公司下的业务团队，当前页面已经接入列表、新增和编辑接口。"
+        actions={
+          <>
+            <button className="secondary-button" type="button" onClick={loadData}>
+              刷新
+            </button>
 
-        <div className="page-actions">
-          <button className="secondary-button" type="button" onClick={loadData}>
-            刷新
-          </button>
-
-          <button className="primary-button" type="button" onClick={openCreateModal}>
-            新增团队
-          </button>
-        </div>
-      </div>
+            <button className="primary-button" type="button" onClick={openCreateModal}>
+              新增团队
+            </button>
+          </>
+        }
+      />
 
       <section className="panel-card">
         <div className="table-toolbar">

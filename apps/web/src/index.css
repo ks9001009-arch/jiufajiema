@@ -469,12 +469,12 @@ button {
   font-weight: 700;
 }
 
-.status-badge.active {
+.status-badge-active {
   color: #027a48;
   background: #ecfdf3;
 }
 
-.status-badge.disabled {
+.status-badge-disabled {
   color: #667085;
   background: #f2f4f7;
 }

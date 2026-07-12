@@ -15,6 +15,8 @@ import type {
   Role,
   Team,
 } from '../api/http'
+import { PageHeader } from '../components/PageHeader'
+import { StatusBadge } from '../components/StatusBadge'
 
 function formatDate(value?: string) {
   if (!value) {
@@ -34,26 +36,6 @@ function formatDate(value?: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function getStatusText(status?: AdminUserStatus) {
-  if (status === 'ACTIVE') {
-    return '启用'
-  }
-
-  if (status === 'DISABLED') {
-    return '停用'
-  }
-
-  return status || '-'
-}
-
-function getStatusClass(status?: AdminUserStatus) {
-  if (status === 'ACTIVE') {
-    return 'active'
-  }
-
-  return 'disabled'
 }
 
 function getDisplayName(user: AdminUser) {
@@ -283,22 +265,21 @@ export function UserPage() {
 
   return (
     <div className="manage-page">
-      <div className="page-header">
-        <div>
-          <h2>用户管理</h2>
-          <p>管理后台账号、员工账号、所属公司团队和角色，当前页面已经接入列表、新增和编辑接口。</p>
-        </div>
+      <PageHeader
+        title="用户管理"
+        subtitle="管理后台账号、员工账号、所属公司团队和角色，当前页面已经接入列表、新增和编辑接口。"
+        actions={
+          <>
+            <button className="secondary-button" type="button" onClick={loadData}>
+              刷新
+            </button>
 
-        <div className="page-actions">
-          <button className="secondary-button" type="button" onClick={loadData}>
-            刷新
-          </button>
-
-          <button className="primary-button" type="button" onClick={openCreateModal}>
-            新增用户
-          </button>
-        </div>
-      </div>
+            <button className="primary-button" type="button" onClick={openCreateModal}>
+              新增用户
+            </button>
+          </>
+        }
+      />
 
       <section className="panel-card">
         <div className="table-toolbar">
@@ -340,9 +321,7 @@ export function UserPage() {
                   <td>{getTeamName(user, teams)}</td>
                   <td>{getRoleName(user, roles)}</td>
                   <td>
-                    <span className={`status-badge ${getStatusClass(user.status)}`}>
-                      {getStatusText(user.status)}
-                    </span>
+                    <StatusBadge status={user.status ?? ''} />
                   </td>
                   <td>{formatDate(user.createdAt)}</td>
                   <td>

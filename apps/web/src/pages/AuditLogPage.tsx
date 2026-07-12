@@ -13,6 +13,7 @@ import type {
   Role,
   Team,
 } from '../api/http'
+import { PageHeader } from '../components/PageHeader'
 
 function formatDate(value?: string) {
   if (!value) {
@@ -167,18 +168,15 @@ export function AuditLogPage() {
 
   return (
     <div className="manage-page">
-      <div className="page-header">
-        <div>
-          <h2>操作日志</h2>
-          <p>查看后台用户操作记录，当前页面已优化操作人、动作和目标显示。</p>
-        </div>
-
-        <div className="page-actions">
+      <PageHeader
+        title="操作日志"
+        subtitle="查看后台用户操作记录，当前页面已优化操作人、动作和目标显示。"
+        actions={
           <button className="secondary-button" type="button" onClick={loadLogs}>
             刷新
           </button>
-        </div>
-      </div>
+        }
+      />
 
       <section className="panel-card">
         <div className="table-toolbar">

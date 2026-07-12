@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createRole, getRoles, updateRole } from '../api/http'
 import type { Role } from '../api/http'
+import { PageHeader } from '../components/PageHeader'
 
 function formatDate(value?: string) {
   if (!value) {
@@ -183,22 +184,21 @@ export function RolePage() {
 
   return (
     <div className="manage-page">
-      <div className="page-header">
-        <div>
-          <h2>角色管理</h2>
-          <p>管理后台角色和权限分组，当前页面已经接入列表、新增和编辑接口。</p>
-        </div>
+      <PageHeader
+        title="角色管理"
+        subtitle="管理后台角色和权限分组，当前页面已经接入列表、新增和编辑接口。"
+        actions={
+          <>
+            <button className="secondary-button" type="button" onClick={loadRoles}>
+              刷新
+            </button>
 
-        <div className="page-actions">
-          <button className="secondary-button" type="button" onClick={loadRoles}>
-            刷新
-          </button>
-
-          <button className="primary-button" type="button" onClick={openCreateModal}>
-            新增角色
-          </button>
-        </div>
-      </div>
+            <button className="primary-button" type="button" onClick={openCreateModal}>
+              新增角色
+            </button>
+          </>
+        }
+      />
 
       <section className="panel-card">
         <div className="table-toolbar">

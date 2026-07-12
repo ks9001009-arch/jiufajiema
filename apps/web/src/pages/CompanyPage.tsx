@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { createCompany, getCompanies, updateCompany } from '../api/http'
 import type { Company, CompanyStatus } from '../api/http'
+import { PageHeader } from '../components/PageHeader'
+import { StatusBadge } from '../components/StatusBadge'
 
 function formatDate(value?: string) {
   if (!value) {
@@ -20,18 +22,6 @@ function formatDate(value?: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function getStatusText(status: Company['status']) {
-  if (status === 'ACTIVE') {
-    return '启用'
-  }
-
-  if (status === 'DISABLED') {
-    return '停用'
-  }
-
-  return status
 }
 
 export function CompanyPage() {
@@ -135,22 +125,21 @@ export function CompanyPage() {
 
   return (
     <div className="manage-page">
-      <div className="page-header">
-        <div>
-          <h2>公司管理</h2>
-          <p>管理平台内的公司主体，当前页面已经接入列表、新增和编辑接口。</p>
-        </div>
+      <PageHeader
+        title="公司管理"
+        subtitle="管理平台内的公司主体，当前页面已经接入列表、新增和编辑接口。"
+        actions={
+          <>
+            <button className="secondary-button" type="button" onClick={loadCompanies}>
+              刷新
+            </button>
 
-        <div className="page-actions">
-          <button className="secondary-button" type="button" onClick={loadCompanies}>
-            刷新
-          </button>
-
-          <button className="primary-button" type="button" onClick={openCreateModal}>
-            新增公司
-          </button>
-        </div>
-      </div>
+            <button className="primary-button" type="button" onClick={openCreateModal}>
+              新增公司
+            </button>
+          </>
+        }
+      />
 
       <section className="panel-card">
         <div className="table-toolbar">
@@ -186,9 +175,7 @@ export function CompanyPage() {
                   <td>{company.name}</td>
                   <td>{company.code}</td>
                   <td>
-                    <span className={`status-badge ${company.status.toLowerCase()}`}>
-                      {getStatusText(company.status)}
-                    </span>
+                    <StatusBadge status={company.status} />
                   </td>
                   <td>{formatDate(company.createdAt)}</td>
                   <td>
