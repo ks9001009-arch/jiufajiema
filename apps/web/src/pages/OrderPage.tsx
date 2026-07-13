@@ -32,6 +32,51 @@ const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 
 const AMOUNT_PATTERN = /^(?:0|[1-9]\d{0,5})(?:\.\d{1,4})?$/
 
+type OrderFilterState = {
+  companyId: string
+  status: string
+  serviceId: string
+  providerId: string
+  userId: string
+  phone: string
+  createdFrom: string
+  createdTo: string
+}
+
+const emptyOrderFilters: OrderFilterState = {
+  companyId: '',
+  status: '',
+  serviceId: '',
+  providerId: '',
+  userId: '',
+  phone: '',
+  createdFrom: '',
+  createdTo: '',
+}
+
+function toOrderQueryParams(
+  filters: OrderFilterState,
+  page: number,
+  pageSize: number,
+) {
+  return {
+    ...(filters.companyId ? { companyId: filters.companyId } : {}),
+    ...(filters.status ? { status: filters.status as OrderStatus } : {}),
+    ...(filters.serviceId ? { serviceId: filters.serviceId } : {}),
+    ...(filters.providerId ? { providerId: filters.providerId } : {}),
+    ...(filters.userId ? { userId: filters.userId } : {}),
+    ...(filters.phone.trim() ? { phone: filters.phone.trim() } : {}),
+    ...(filters.createdFrom
+      ? { createdFrom: new Date(filters.createdFrom).toISOString() }
+      : {}),
+    ...(filters.createdTo
+      ? { createdTo: new Date(filters.createdTo).toISOString() }
+      : {}),
+    page,
+    pageSize,
+  }
+}
+
 function formatDate(value?: string) {
   if (!value) {
     return '-'
@@ -61,6 +106,11 @@ export function OrderPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [filters, setFilters] = useState<OrderFilterState>(emptyOrderFilters)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
 
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [statusModalOpen, setStatusModalOpen] = useState(false)
@@ -93,28 +143,71 @@ export function OrderPage() {
   )
   const availableUsers = users.filter((user) => user.companyId === companyId)
 
+  const filterServices = services.filter(
+    (service) => !filters.companyId || service.companyId === filters.companyId,
+  )
+  const filterProviders = providers.filter((provider) => {
+    if (filters.companyId && provider.companyId !== filters.companyId) {
+      return false
+    }
+
+    if (
+      filters.serviceId &&
+      !provider.services.some((service) => service.id === filters.serviceId)
+    ) {
+      return false
+    }
+
+    return true
+  })
+  const filterUsers = users.filter(
+    (user) => !filters.companyId || user.companyId === filters.companyId,
+  )
+
+  async function loadOrders(
+    nextFilters = filters,
+    nextPage = page,
+    nextPageSize = pageSize,
+  ) {
+    setLoading(true)
+    setError('')
+
+    try {
+      const orderResult = await getOrders(
+        toOrderQueryParams(nextFilters, nextPage, nextPageSize),
+      )
+      setOrders(orderResult.items)
+      setTotal(orderResult.total)
+      setPage(orderResult.page)
+      setPageSize(orderResult.pageSize)
+      setTotalPages(orderResult.totalPages)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载订单失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function loadData() {
     setLoading(true)
     setError('')
 
     try {
-      const [
-        orderResult,
-        companyResult,
-        serviceResult,
-        providerResult,
-        phoneResourceResult,
-        userResult,
-      ] = await Promise.all([
-        getOrders(),
-        getCompanies(),
-        getServices(),
-        getProviders(),
-        getPhoneResources(),
-        getUsers(),
-      ])
+      const [orderResult, companyResult, serviceResult, providerResult, phoneResourceResult, userResult] =
+        await Promise.all([
+          getOrders({ page: 1, pageSize: 20 }),
+          getCompanies(),
+          getServices(),
+          getProviders(),
+          getPhoneResources(),
+          getUsers(),
+        ])
 
-      setOrders(orderResult)
+      setOrders(orderResult.items)
+      setTotal(orderResult.total)
+      setPage(orderResult.page)
+      setPageSize(orderResult.pageSize)
+      setTotalPages(orderResult.totalPages)
       setCompanies(companyResult)
       setServices(serviceResult)
       setProviders(providerResult)
@@ -239,6 +332,57 @@ export function OrderPage() {
     setPhoneResourceId(nextPhone?.id || '')
   }
 
+  function handleFilterCompanyChange(nextCompanyId: string) {
+    setFilters((current) => ({
+      ...current,
+      companyId: nextCompanyId,
+      serviceId: '',
+      providerId: '',
+      userId: '',
+    }))
+  }
+
+  function handleFilterServiceChange(nextServiceId: string) {
+    setFilters((current) => ({
+      ...current,
+      serviceId: nextServiceId,
+      providerId: '',
+    }))
+  }
+
+  function handleSearch() {
+    setPage(1)
+    loadOrders(filters, 1, pageSize)
+  }
+
+  function handleResetFilters() {
+    setFilters(emptyOrderFilters)
+    setPage(1)
+    loadOrders(emptyOrderFilters, 1, pageSize)
+  }
+
+  function handlePageSizeChange(nextPageSize: number) {
+    setPage(1)
+    setPageSize(nextPageSize)
+    loadOrders(filters, 1, nextPageSize)
+  }
+
+  function handlePreviousPage() {
+    if (page <= 1) {
+      return
+    }
+
+    loadOrders(filters, page - 1, pageSize)
+  }
+
+  function handleNextPage() {
+    if (page >= totalPages) {
+      return
+    }
+
+    loadOrders(filters, page + 1, pageSize)
+  }
+
   async function handleCreateOrder() {
     const trimmedAmount = amount.trim()
 
@@ -281,7 +425,7 @@ export function OrderPage() {
       })
 
       setCreateModalOpen(false)
-      await loadData()
+      await loadOrders(filters, page, pageSize)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : '新增订单失败')
     } finally {
@@ -301,7 +445,7 @@ export function OrderPage() {
       await updateOrderStatus(statusTarget.id, { status: nextStatus })
       setStatusModalOpen(false)
       setStatusTarget(null)
-      await loadData()
+      await loadOrders(filters, page, pageSize)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : '更新订单状态失败')
     } finally {
@@ -316,7 +460,11 @@ export function OrderPage() {
         subtitle="创建接码订单并手工推进状态，号码锁定与释放由后端事务保证。"
         actions={
           <>
-            <button className="secondary-button" type="button" onClick={loadData}>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => loadOrders(filters, page, pageSize)}
+            >
               刷新
             </button>
 
@@ -327,11 +475,157 @@ export function OrderPage() {
         }
       />
 
+      <section className="panel-card filter-panel">
+        <div className="filter-grid">
+          <label>
+            <span>公司</span>
+            <select
+              value={filters.companyId}
+              onChange={(event) => handleFilterCompanyChange(event.target.value)}
+            >
+              <option value="">全部公司</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>状态</span>
+            <select
+              value={filters.status}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  status: event.target.value,
+                }))
+              }
+            >
+              <option value="">全部状态</option>
+              {Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>服务</span>
+            <select
+              value={filters.serviceId}
+              onChange={(event) => handleFilterServiceChange(event.target.value)}
+            >
+              <option value="">全部服务</option>
+              {filterServices.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>供应商</span>
+            <select
+              value={filters.providerId}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  providerId: event.target.value,
+                }))
+              }
+            >
+              <option value="">全部供应商</option>
+              {filterProviders.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>用户</span>
+            <select
+              value={filters.userId}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  userId: event.target.value,
+                }))
+              }
+            >
+              <option value="">全部用户</option>
+              {filterUsers.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.displayName || user.username}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>号码关键字</span>
+            <input
+              value={filters.phone}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  phone: event.target.value,
+                }))
+              }
+              placeholder="支持模糊匹配，如 +1415"
+            />
+          </label>
+
+          <label>
+            <span>开始时间</span>
+            <input
+              type="datetime-local"
+              value={filters.createdFrom}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  createdFrom: event.target.value,
+                }))
+              }
+            />
+          </label>
+
+          <label>
+            <span>结束时间</span>
+            <input
+              type="datetime-local"
+              value={filters.createdTo}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  createdTo: event.target.value,
+                }))
+              }
+            />
+          </label>
+        </div>
+
+        <div className="filter-actions">
+          <button className="secondary-button" type="button" onClick={handleResetFilters}>
+            重置
+          </button>
+
+          <button className="primary-button" type="button" onClick={handleSearch}>
+            查询
+          </button>
+        </div>
+      </section>
+
       <section className="panel-card">
         <div className="table-toolbar">
           <strong>订单列表</strong>
           <span>
-            {loading ? '正在加载...' : `共 ${orders.length} 条订单`}
+            {loading ? '正在加载...' : `共 ${total} 条订单`}
           </span>
         </div>
 
@@ -410,6 +704,47 @@ export function OrderPage() {
             )}
           </tbody>
         </table>
+
+        <div className="pagination-bar">
+          <span className="pagination-summary">共 {total} 条记录</span>
+
+          <div className="pagination-controls">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={handlePreviousPage}
+              disabled={loading || total === 0 || page <= 1}
+            >
+              上一页
+            </button>
+
+            <span className="pagination-status">
+              {total === 0 ? '第 0 / 0 页' : `第 ${page} / ${totalPages} 页`}
+            </span>
+
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={handleNextPage}
+              disabled={loading || total === 0 || page >= totalPages}
+            >
+              下一页
+            </button>
+
+            <select
+              className="pagination-size"
+              value={pageSize}
+              onChange={(event) =>
+                handlePageSizeChange(Number(event.target.value))
+              }
+              disabled={loading}
+            >
+              <option value={20}>每页 20 条</option>
+              <option value={50}>每页 50 条</option>
+              <option value={100}>每页 100 条</option>
+            </select>
+          </div>
+        </div>
       </section>
 
       {createModalOpen ? (

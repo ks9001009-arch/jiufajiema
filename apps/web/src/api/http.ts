@@ -409,11 +409,29 @@ export type Order = {
   updatedAt?: string
 }
 
-export async function getOrders(params?: {
+export type PaginatedResponse<T> = {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export type OrderListParams = {
   companyId?: string
   status?: OrderStatus
+  serviceId?: string
+  providerId?: string
+  phoneResourceId?: string
   userId?: string
-}) {
+  phone?: string
+  createdFrom?: string
+  createdTo?: string
+  page?: number
+  pageSize?: number
+}
+
+export async function getOrders(params?: OrderListParams) {
   const search = new URLSearchParams()
 
   if (params?.companyId) {
@@ -424,14 +442,45 @@ export async function getOrders(params?: {
     search.set('status', params.status)
   }
 
+  if (params?.serviceId) {
+    search.set('serviceId', params.serviceId)
+  }
+
+  if (params?.providerId) {
+    search.set('providerId', params.providerId)
+  }
+
+  if (params?.phoneResourceId) {
+    search.set('phoneResourceId', params.phoneResourceId)
+  }
+
   if (params?.userId) {
     search.set('userId', params.userId)
   }
 
+  if (params?.phone) {
+    search.set('phone', params.phone)
+  }
+
+  if (params?.createdFrom) {
+    search.set('createdFrom', params.createdFrom)
+  }
+
+  if (params?.createdTo) {
+    search.set('createdTo', params.createdTo)
+  }
+
+  if (params?.page !== undefined) {
+    search.set('page', String(params.page))
+  }
+
+  if (params?.pageSize !== undefined) {
+    search.set('pageSize', String(params.pageSize))
+  }
+
   const query = search.toString()
   const path = query ? `/orders?${query}` : '/orders'
-  const response = await request<ListResponse<Order>>(path)
-  return normalizeList(response)
+  return request<PaginatedResponse<Order>>(path)
 }
 
 export async function getOrder(id: string) {

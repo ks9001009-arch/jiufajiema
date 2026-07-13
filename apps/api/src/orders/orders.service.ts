@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import {
   TERMINAL_ORDER_STATUSES,
@@ -29,7 +30,15 @@ type OrderRecord = {
 type OrderFilters = {
   companyId?: string;
   status?: OrderStatus;
+  serviceId?: string;
+  providerId?: string;
+  phoneResourceId?: string;
   userId?: string;
+  phone?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  page?: number;
+  pageSize?: number;
 };
 
 const companySelect = {
@@ -92,18 +101,62 @@ const terminalStatusSet = new Set<string>(TERMINAL_ORDER_STATUSES);
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(filters: OrderFilters) {
-    const orders = await this.prisma.order.findMany({
-      where: {
-        ...(filters.companyId ? { companyId: filters.companyId } : {}),
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.userId ? { userId: filters.userId } : {}),
-      },
-      select: orderSelect,
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(query: ListOrdersQueryDto) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const where = this.buildListWhere(query);
 
-    return orders.map((order) => this.toResponse(order));
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        select: orderSelect,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+
+    return {
+      items: orders.map((order) => this.toResponse(order)),
+      total,
+      page,
+      pageSize,
+      totalPages,
+    };
+  }
+
+  private buildListWhere(filters: OrderFilters) {
+    const createdAt =
+      filters.createdFrom || filters.createdTo
+        ? {
+            ...(filters.createdFrom
+              ? { gte: new Date(filters.createdFrom) }
+              : {}),
+            ...(filters.createdTo ? { lte: new Date(filters.createdTo) } : {}),
+          }
+        : undefined;
+
+    return {
+      ...(filters.companyId ? { companyId: filters.companyId } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.serviceId ? { serviceId: filters.serviceId } : {}),
+      ...(filters.providerId ? { providerId: filters.providerId } : {}),
+      ...(filters.phoneResourceId
+        ? { phoneResourceId: filters.phoneResourceId }
+        : {}),
+      ...(filters.userId ? { userId: filters.userId } : {}),
+      ...(filters.phone
+        ? {
+            phoneResource: {
+              phone: { contains: filters.phone.trim() },
+            },
+          }
+        : {}),
+      ...(createdAt ? { createdAt } : {}),
+    };
   }
 
   async findOne(id: string) {
