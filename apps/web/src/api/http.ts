@@ -517,6 +517,127 @@ export async function updateOrderStatus(
   })
 }
 
+export type SmsStatus = 'RECEIVED' | 'FAILED'
+
+export type Sms = {
+  id: string
+  orderId: string
+  code?: string | null
+  content?: string | null
+  status: SmsStatus
+  receivedAt?: string | null
+  createdAt?: string
+  order?: {
+    id: string
+    companyId: string
+    status: OrderStatus
+    company?: {
+      id: string
+      name: string
+      code?: string
+    } | null
+    service?: {
+      id: string
+      name: string
+      code?: string
+    } | null
+    provider?: {
+      id: string
+      name: string
+      code?: string
+      status?: ProviderStatus
+    } | null
+    phoneResource?: {
+      id: string
+      phone: string
+      country?: string | null
+      status?: PhoneResourceStatus
+    } | null
+  } | null
+}
+
+export type SmsListParams = {
+  companyId?: string
+  orderId?: string
+  phone?: string
+  code?: string
+  status?: SmsStatus
+  orderStatus?: OrderStatus
+  createdFrom?: string
+  createdTo?: string
+  page?: number
+  pageSize?: number
+}
+
+export async function getSmsList(params?: SmsListParams) {
+  const search = new URLSearchParams()
+
+  if (params?.companyId) {
+    search.set('companyId', params.companyId)
+  }
+
+  if (params?.orderId) {
+    search.set('orderId', params.orderId)
+  }
+
+  if (params?.phone) {
+    search.set('phone', params.phone)
+  }
+
+  if (params?.code) {
+    search.set('code', params.code)
+  }
+
+  if (params?.status) {
+    search.set('status', params.status)
+  }
+
+  if (params?.orderStatus) {
+    search.set('orderStatus', params.orderStatus)
+  }
+
+  if (params?.createdFrom) {
+    search.set('createdFrom', params.createdFrom)
+  }
+
+  if (params?.createdTo) {
+    search.set('createdTo', params.createdTo)
+  }
+
+  if (params?.page !== undefined) {
+    search.set('page', String(params.page))
+  }
+
+  if (params?.pageSize !== undefined) {
+    search.set('pageSize', String(params.pageSize))
+  }
+
+  const query = search.toString()
+  const path = query ? `/sms?${query}` : '/sms'
+  return request<PaginatedResponse<Sms>>(path)
+}
+
+export async function getOrderSms(orderId: string) {
+  return request<Sms[]>(`/orders/${orderId}/sms`)
+}
+
+export type CreateOrderSmsPayload = {
+  companyId: string
+  code?: string
+  content?: string
+  receivedAt?: string
+}
+
+export async function createOrderSms(
+  orderId: string,
+  payload: CreateOrderSmsPayload,
+) {
+  return request<Sms>(`/orders/${orderId}/sms`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export type Team = {
   id: string
   name: string

@@ -16,6 +16,7 @@ import { PhoneResourcePage } from './pages/PhoneResourcePage'
 import { ProviderPage } from './pages/ProviderPage'
 import { RolePage } from './pages/RolePage'
 import { ServicePage } from './pages/ServicePage'
+import { SmsPage } from './pages/SmsPage'
 import { TeamPage } from './pages/TeamPage'
 import { UserPage } from './pages/UserPage'
 const PAGE_PERMISSIONS: Record<AdminPageKey, string> = {
@@ -28,6 +29,7 @@ const PAGE_PERMISSIONS: Record<AdminPageKey, string> = {
   providers: 'provider.read',
   phoneResources: 'phoneResource.read',
   orders: 'order.read',
+  sms: 'sms.read',
   auditLogs: 'audit.read',
 }
 
@@ -127,6 +129,8 @@ useEffect(() => {
         return <PhoneResourcePage />
       case 'orders':
         return <OrderPage />
+      case 'sms':
+        return <SmsPage />
       case 'auditLogs':
         return <AuditLogPage />
       case 'dashboard':

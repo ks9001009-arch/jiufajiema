@@ -11,6 +11,7 @@ export type AdminPageKey =
   | 'providers'
   | 'phoneResources'
   | 'orders'
+  | 'sms'
   | 'auditLogs'
 
 type AdminLayoutProps = {
@@ -57,6 +58,7 @@ const menuGroups: AdminMenuGroup[] = [
         permission: 'phoneResource.read',
       },
       { key: 'orders', label: '订单管理', permission: 'order.read' },
+      { key: 'sms', label: '短信记录', permission: 'sms.read' },
     ],
   },
   {

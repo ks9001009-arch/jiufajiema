@@ -9,7 +9,6 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import {
-  TERMINAL_ORDER_STATUSES,
   type OrderStatus,
   type TerminalOrderStatus,
 } from './dto/order.validation';
@@ -94,8 +93,6 @@ const orderSelect = {
   phoneResource: { select: phoneResourceSelect },
   user: { select: userSelect },
 } as const;
-
-const terminalStatusSet = new Set<string>(TERMINAL_ORDER_STATUSES);
 
 @Injectable()
 export class OrdersService {
@@ -244,15 +241,18 @@ export class OrdersService {
       throw new NotFoundException(`Order with id "${id}" not found`);
     }
 
+    if (dto.status === 'SUCCESS' && existing.status === 'SUCCESS') {
+      throw new ConflictException('Order is already successful');
+    }
+
     if (existing.status !== 'WAIT_SMS') {
       throw new BadRequestException(
         'Only orders in WAIT_SMS status can be updated',
       );
     }
 
-    if (terminalStatusSet.has(existing.status)) {
-      throw new BadRequestException('Order is already in a terminal status');
-    }
+    const auditAction =
+      dto.status === 'SUCCESS' ? 'order.force_success' : 'order.status';
 
     const nextPhoneStatus = this.resolvePhoneStatus(dto.status);
 
@@ -284,7 +284,7 @@ export class OrdersService {
 
     await this.prisma.auditLog.create({
       data: {
-        action: 'order.status',
+        action: auditAction,
         targetType: 'Order',
         targetId: order.id,
         actorUserId,

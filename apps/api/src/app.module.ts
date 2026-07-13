@@ -6,6 +6,7 @@ import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { OrdersModule } from './orders/orders.module';
 import { PhoneResourcesModule } from './phone-resources/phone-resources.module';
+import { SmsModule } from './sms/sms.module';
 import { ProvidersModule } from './providers/providers.module';
 import { RolesModule } from './roles/roles.module';
 import { ServicesModule } from './services/services.module';
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module';
     ProvidersModule,
     PhoneResourcesModule,
     OrdersModule,
+    SmsModule,
     RolesModule,
     UsersModule,
     AuditLogsModule,

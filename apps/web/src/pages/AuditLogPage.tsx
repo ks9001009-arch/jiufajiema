@@ -52,6 +52,8 @@ function getActionText(action: string) {
     'phoneResource.update': '编辑号码资源',
     'order.create': '新增订单',
     'order.status': '订单状态变更',
+    'order.force_success': '手工完成订单',
+    'sms.create': '收到短信',
     CREATE: '新增',
     UPDATE: '编辑',
     DELETE: '删除',

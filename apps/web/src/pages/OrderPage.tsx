@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   createOrder,
+  createOrderSms,
   getCompanies,
   getOrders,
   getPhoneResources,
@@ -118,6 +119,10 @@ export function OrderPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [statusModalOpen, setStatusModalOpen] = useState(false)
   const [statusTarget, setStatusTarget] = useState<Order | null>(null)
+  const [smsModalOpen, setSmsModalOpen] = useState(false)
+  const [smsTarget, setSmsTarget] = useState<Order | null>(null)
+  const [smsCode, setSmsCode] = useState('')
+  const [smsContent, setSmsContent] = useState('')
   const [nextStatus, setNextStatus] =
     useState<'SUCCESS' | 'FAILED' | 'CANCELLED'>('SUCCESS')
 
@@ -282,6 +287,23 @@ export function OrderPage() {
     setStatusTarget(null)
   }
 
+  function openSmsModal(order: Order) {
+    setSmsTarget(order)
+    setSmsCode('')
+    setSmsContent('')
+    setFormError('')
+    setSmsModalOpen(true)
+  }
+
+  function closeSmsModal() {
+    if (saving) {
+      return
+    }
+
+    setSmsModalOpen(false)
+    setSmsTarget(null)
+  }
+
   function handleCompanyChange(nextCompanyId: string) {
     const nextService = services.find(
       (service) => service.companyId === nextCompanyId,
@@ -420,6 +442,39 @@ export function OrderPage() {
     }
   }
 
+  async function handleCreateSms() {
+    if (!smsTarget) {
+      return
+    }
+
+    const trimmedCode = smsCode.trim()
+    const trimmedContent = smsContent.trim()
+
+    if (!trimmedCode && !trimmedContent) {
+      setFormError('验证码和短信内容至少填写一项')
+      return
+    }
+
+    setSaving(true)
+    setFormError('')
+
+    try {
+      await createOrderSms(smsTarget.id, {
+        companyId: smsTarget.companyId,
+        code: trimmedCode || undefined,
+        content: trimmedContent || undefined,
+      })
+
+      setSmsModalOpen(false)
+      setSmsTarget(null)
+      await loadOrders(filters, page, pageSize)
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : '录入短信失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleUpdateStatus() {
     if (!statusTarget) {
       return
@@ -506,13 +561,22 @@ export function OrderPage() {
       header: '操作',
       render: (order) =>
         order.status === 'WAIT_SMS' ? (
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => openStatusModal(order)}
-          >
-            变更状态
-          </button>
+          <div className="table-actions">
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => openSmsModal(order)}
+            >
+              录入短信
+            </button>
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => openStatusModal(order)}
+            >
+              变更状态
+            </button>
+          </div>
         ) : (
           '-'
         ),
@@ -856,10 +920,10 @@ export function OrderPage() {
           <div className="modal-card">
             <div className="modal-header">
               <div>
-                <h3>变更订单状态</h3>
+                <h3>手工变更订单状态</h3>
                 <p>
                   订单 {statusTarget.id.slice(0, 8)}... 当前状态：
-                  {ORDER_STATUS_LABELS[statusTarget.status]}
+                  {ORDER_STATUS_LABELS[statusTarget.status]}。正常完成请使用「录入短信」。
                 </p>
               </div>
 
@@ -883,7 +947,7 @@ export function OrderPage() {
                     )
                   }
                 >
-                  <option value="SUCCESS">成功</option>
+                  <option value="SUCCESS">手工完成（成功）</option>
                   <option value="FAILED">失败</option>
                   <option value="CANCELLED">已取消</option>
                 </select>
@@ -909,6 +973,73 @@ export function OrderPage() {
                 disabled={saving}
               >
                 {saving ? '保存中...' : '确认变更'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {smsModalOpen && smsTarget ? (
+        <div className="modal-mask">
+          <div className="modal-card">
+            <div className="modal-header">
+              <div>
+                <h3>内部测试录入短信</h3>
+                <p>
+                  订单 {smsTarget.id.slice(0, 8)}... 号码：
+                  {smsTarget.phoneResource?.phone || '-'}
+                </p>
+              </div>
+
+              <button
+                className="modal-close"
+                type="button"
+                onClick={closeSmsModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="modal-form">
+              <label>
+                <span>验证码</span>
+                <input
+                  value={smsCode}
+                  onChange={(event) => setSmsCode(event.target.value)}
+                  placeholder="可选"
+                />
+              </label>
+
+              <label>
+                <span>短信内容</span>
+                <textarea
+                  value={smsContent}
+                  onChange={(event) => setSmsContent(event.target.value)}
+                  placeholder="可选，验证码与内容至少填写一项"
+                  rows={4}
+                />
+              </label>
+
+              {formError ? <div className="form-error">{formError}</div> : null}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={closeSmsModal}
+                disabled={saving}
+              >
+                取消
+              </button>
+
+              <button
+                className="primary-button"
+                type="button"
+                onClick={handleCreateSms}
+                disabled={saving}
+              >
+                {saving ? '录入中...' : '确认录入'}
               </button>
             </div>
           </div>
