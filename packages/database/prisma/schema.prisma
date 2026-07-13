@@ -33,6 +33,7 @@ model Company {
   providers      Provider[]
   phoneResources PhoneResource[]
   orders         Order[]
+  countries      CompanyCountry[]
 }
 
 model Team {
@@ -40,10 +41,13 @@ model Team {
   name      String
   companyId String
   company   Company  @relation(fields: [companyId], references: [id])
+  countryPolicyMode TeamCountryPolicyMode @default(INHERIT)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users User[]
+  users           User[]
+  countryPolicies TeamCountry[]
+  orders          Order[]
 }
 
 model Role {
@@ -152,6 +156,43 @@ enum SmsStatus {
   FAILED
 }
 
+enum TeamCountryPolicyMode {
+  INHERIT
+  ALLOW_LIST
+}
+
+model Country {
+  code      String  @id
+  nameZh    String
+  nameEn    String
+  emoji     String?
+  enabled   Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  companyCountries CompanyCountry[]
+  teamCountries    TeamCountry[]
+}
+
+model CompanyCountry {
+  companyId   String
+  countryCode String
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  country     Country @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+
+  @@id([companyId, countryCode])
+  @@index([companyId])
+}
+
+model TeamCountry {
+  teamId      String
+  countryCode String
+  team        Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  country     Country @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+
+  @@id([teamId, countryCode])
+  @@index([teamId])
+}
+
 model Service {
   id String @id @default(uuid())
 
@@ -208,6 +249,9 @@ model Order {
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
 
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id])
+
   serviceId String
   service   Service @relation(fields: [serviceId], references: [id])
 
@@ -229,6 +273,7 @@ model Order {
   @@index([companyId])
   @@index([companyId, status])
   @@index([userId])
+  @@index([teamId])
   @@index([phoneResourceId])
   @@index([createdAt])
 }

@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react'
-import { createTeam, getCompanies, getTeams, updateTeam } from '../api/http'
-import type { Company, Team } from '../api/http'
+import { useEffect, useMemo, useState } from 'react'
+import { createTeam, getCompanies, getCountries, getTeams, updateTeam } from '../api/http'
+import type {
+  Company,
+  Country,
+  Team,
+  TeamCountryPolicyMode,
+} from '../api/http'
 import { PageHeader } from '../components/PageHeader'
 
 function formatDate(value?: string) {
@@ -32,9 +37,18 @@ function getCompanyName(team: Team, companies: Company[]) {
   return company?.name || team.companyId || '-'
 }
 
+function getPolicyLabel(mode?: TeamCountryPolicyMode) {
+  if (mode === 'ALLOW_LIST') {
+    return '指定国家'
+  }
+
+  return '继承公司'
+}
+
 export function TeamPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
+  const [countries, setCountries] = useState<Country[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -42,23 +56,34 @@ export function TeamPage() {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [name, setName] = useState('')
   const [companyId, setCompanyId] = useState('')
+  const [countryPolicyMode, setCountryPolicyMode] =
+    useState<TeamCountryPolicyMode>('INHERIT')
+  const [countryCodes, setCountryCodes] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
   const isEditing = Boolean(editingTeam)
+
+  const selectedCompany = companies.find((item) => item.id === companyId)
+  const companyCountryOptions = useMemo(() => {
+    const allowed = new Set(selectedCompany?.countryCodes || [])
+    return countries.filter((country) => allowed.has(country.code))
+  }, [countries, selectedCompany?.countryCodes])
 
   async function loadData() {
     setLoading(true)
     setError('')
 
     try {
-      const [teamResult, companyResult] = await Promise.all([
+      const [teamResult, companyResult, countryResult] = await Promise.all([
         getTeams(),
         getCompanies(),
+        getCountries(),
       ])
 
       setTeams(teamResult)
       setCompanies(companyResult)
+      setCountries(countryResult)
 
       if (!companyId && companyResult.length > 0) {
         setCompanyId(companyResult[0].id)
@@ -78,6 +103,8 @@ export function TeamPage() {
     setEditingTeam(null)
     setName('')
     setCompanyId(companies[0]?.id || '')
+    setCountryPolicyMode('INHERIT')
+    setCountryCodes([])
     setFormError('')
     setModalOpen(true)
   }
@@ -86,6 +113,8 @@ export function TeamPage() {
     setEditingTeam(team)
     setName(team.name)
     setCompanyId(team.companyId)
+    setCountryPolicyMode(team.countryPolicyMode || 'INHERIT')
+    setCountryCodes(team.countryCodes || [])
     setFormError('')
     setModalOpen(true)
   }
@@ -96,6 +125,24 @@ export function TeamPage() {
     }
 
     setModalOpen(false)
+  }
+
+  function handleCompanyChange(nextCompanyId: string) {
+    setCompanyId(nextCompanyId)
+    setCountryCodes((current) => {
+      const allowed = new Set(
+        companies.find((item) => item.id === nextCompanyId)?.countryCodes || [],
+      )
+      return current.filter((code) => allowed.has(code))
+    })
+  }
+
+  function toggleCountryCode(code: string) {
+    setCountryCodes((current) =>
+      current.includes(code)
+        ? current.filter((item) => item !== code)
+        : [...current, code].sort(),
+    )
   }
 
   async function handleSubmitTeam() {
@@ -111,20 +158,26 @@ export function TeamPage() {
       return
     }
 
+    if (countryPolicyMode === 'ALLOW_LIST' && countryCodes.length === 0) {
+      setFormError('指定国家模式下请至少选择一个国家')
+      return
+    }
+
     setSaving(true)
     setFormError('')
 
     try {
+      const payload = {
+        name: trimmedName,
+        companyId,
+        countryPolicyMode,
+        ...(countryPolicyMode === 'ALLOW_LIST' ? { countryCodes } : {}),
+      }
+
       if (editingTeam) {
-        await updateTeam(editingTeam.id, {
-          name: trimmedName,
-          companyId,
-        })
+        await updateTeam(editingTeam.id, payload)
       } else {
-        await createTeam({
-          name: trimmedName,
-          companyId,
-        })
+        await createTeam(payload)
       }
 
       setModalOpen(false)
@@ -171,6 +224,7 @@ export function TeamPage() {
             <tr>
               <th>团队名称</th>
               <th>所属公司</th>
+              <th>国家策略</th>
               <th>创建时间</th>
               <th>操作</th>
             </tr>
@@ -179,13 +233,14 @@ export function TeamPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4}>正在加载团队列表...</td>
+                <td colSpan={5}>正在加载团队列表...</td>
               </tr>
             ) : teams.length > 0 ? (
               teams.map((team) => (
                 <tr key={team.id}>
                   <td>{team.name}</td>
                   <td>{getCompanyName(team, companies)}</td>
+                  <td>{getPolicyLabel(team.countryPolicyMode)}</td>
                   <td>{formatDate(team.createdAt)}</td>
                   <td>
                     <button
@@ -200,7 +255,7 @@ export function TeamPage() {
               ))
             ) : (
               <tr>
-                <td colSpan={4}>暂无团队数据</td>
+                <td colSpan={5}>暂无团队数据</td>
               </tr>
             )}
           </tbody>
@@ -226,7 +281,8 @@ export function TeamPage() {
                 <span>所属公司</span>
                 <select
                   value={companyId}
-                  onChange={(event) => setCompanyId(event.target.value)}
+                  onChange={(event) => handleCompanyChange(event.target.value)}
+                  disabled={isEditing}
                 >
                   {companies.length > 0 ? (
                     companies.map((company) => (
@@ -248,6 +304,50 @@ export function TeamPage() {
                   placeholder="例如：运营一组"
                 />
               </label>
+
+              <label>
+                <span>国家访问策略</span>
+                <select
+                  value={countryPolicyMode}
+                  onChange={(event) =>
+                    setCountryPolicyMode(event.target.value as TeamCountryPolicyMode)
+                  }
+                >
+                  <option value="INHERIT">继承公司</option>
+                  <option value="ALLOW_LIST">指定国家</option>
+                </select>
+              </label>
+
+              {countryPolicyMode === 'ALLOW_LIST' ? (
+                <div className="form-field">
+                  <span>允许的国家/地区</span>
+                  {companyCountryOptions.length > 0 ? (
+                    <div className="checkbox-grid">
+                      {companyCountryOptions.map((country) => (
+                        <label key={country.code} className="checkbox-option">
+                          <input
+                            type="checkbox"
+                            checked={countryCodes.includes(country.code)}
+                            onChange={() => toggleCountryCode(country.code)}
+                          />
+                          <span>
+                            {country.emoji ? `${country.emoji} ` : ''}
+                            {country.nameZh}（{country.code}）
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="form-hint form-hint-warning">
+                      所属公司尚未配置开放国家，无法指定团队国家。
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="form-hint">
+                  继承模式下，团队使用所属公司的开放国家列表。
+                </p>
+              )}
 
               {formError ? <div className="form-error">{formError}</div> : null}
             </div>

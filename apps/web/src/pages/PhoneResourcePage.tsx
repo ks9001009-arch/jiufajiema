@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import {
   createPhoneResource,
   getCompanies,
+  getCountries,
   getPhoneResources,
   getProviders,
   updatePhoneResource,
 } from '../api/http'
 import type {
   Company,
+  Country,
   PhoneResource,
   PhoneResourceStatus,
   Provider,
@@ -25,7 +27,6 @@ const PHONE_STATUS_LABELS: Record<PhoneResourceStatus, string> = {
 }
 
 const E164_PHONE_PATTERN = /^\+[1-9]\d{1,14}$/
-const COUNTRY_PATTERN = /^[A-Z]{2}$/
 const COST_PATTERN = /^(?:0|[1-9]\d{0,5})(?:\.\d{1,4})?$/
 
 function formatDate(value?: string) {
@@ -52,6 +53,7 @@ export function PhoneResourcePage() {
   const [resources, setResources] = useState<PhoneResource[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
   const [providers, setProviders] = useState<Provider[]>([])
+  const [countries, setCountries] = useState<Country[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -78,16 +80,18 @@ export function PhoneResourcePage() {
     setError('')
 
     try {
-      const [resourceResult, companyResult, providerResult] =
+      const [resourceResult, companyResult, providerResult, countryResult] =
         await Promise.all([
           getPhoneResources(),
           getCompanies(),
           getProviders(),
+          getCountries(),
         ])
 
       setResources(resourceResult)
       setCompanies(companyResult)
       setProviders(providerResult)
+      setCountries(countryResult)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载号码资源失败')
     } finally {
@@ -165,8 +169,8 @@ export function PhoneResourcePage() {
       return
     }
 
-    if (normalizedCountry && !COUNTRY_PATTERN.test(normalizedCountry)) {
-      setFormError('国家必须是两个大写英文字母，例如 US')
+    if (!normalizedCountry) {
+      setFormError('请选择国家')
       return
     }
 
@@ -183,7 +187,7 @@ export function PhoneResourcePage() {
         await updatePhoneResource(editingResource.id, {
           providerId,
           phone: trimmedPhone,
-          country: normalizedCountry || null,
+          country: normalizedCountry,
           cost: trimmedCost,
           status,
         })
@@ -192,7 +196,7 @@ export function PhoneResourcePage() {
           companyId,
           providerId,
           phone: trimmedPhone,
-          country: normalizedCountry || null,
+          country: normalizedCountry,
           cost: trimmedCost,
           status,
         })
@@ -354,12 +358,18 @@ export function PhoneResourcePage() {
 
               <label>
                 <span>国家</span>
-                <input
+                <select
                   value={country}
-                  onChange={(event) => setCountry(event.target.value.toUpperCase())}
-                  placeholder="US"
-                  maxLength={2}
-                />
+                  onChange={(event) => setCountry(event.target.value)}
+                >
+                  <option value="">请选择国家</option>
+                  {countries.map((item) => (
+                    <option key={item.code} value={item.code}>
+                      {item.emoji ? `${item.emoji} ` : ''}
+                      {item.nameZh}（{item.code}）
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <label>

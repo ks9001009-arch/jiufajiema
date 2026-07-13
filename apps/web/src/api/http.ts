@@ -139,11 +139,20 @@ export async function getDashboardStats() {
 
 export type CompanyStatus = 'ACTIVE' | 'DISABLED'
 
+export type Country = {
+  code: string
+  nameZh: string
+  nameEn: string
+  emoji?: string | null
+  sortOrder: number
+}
+
 export type Company = {
   id: string
   name: string
   code: string
   status: CompanyStatus
+  countryCodes?: string[]
   createdAt?: string
   updatedAt?: string
 }
@@ -170,9 +179,28 @@ export async function getCompanies() {
   return normalizeList(response)
 }
 
+export async function getCountries() {
+  const response = await request<ListResponse<Country>>('/countries')
+  return normalizeList(response)
+}
+
+export async function getEffectiveCountries(
+  companyId: string,
+  teamId?: string | null,
+) {
+  const search = new URLSearchParams({ companyId })
+
+  if (teamId) {
+    search.set('teamId', teamId)
+  }
+
+  return request<string[]>(`/country-access/effective?${search.toString()}`)
+}
+
 export type CreateCompanyPayload = {
   name: string
   code: string
+  countryCodes?: string[]
 }
 
 export async function createCompany(payload: CreateCompanyPayload) {
@@ -186,6 +214,7 @@ export type UpdateCompanyPayload = {
   name?: string
   code?: string
   status?: CompanyStatus
+  countryCodes?: string[]
 }
 
 export async function updateCompany(id: string, payload: UpdateCompanyPayload) {
@@ -405,6 +434,7 @@ export type Order = {
   id: string
   companyId: string
   userId?: string | null
+  teamId?: string | null
   serviceId: string
   providerId: string
   phoneResourceId: string
@@ -675,10 +705,14 @@ export async function createOrderSms(
   })
 }
 
+export type TeamCountryPolicyMode = 'INHERIT' | 'ALLOW_LIST'
+
 export type Team = {
   id: string
   name: string
   companyId: string
+  countryPolicyMode?: TeamCountryPolicyMode
+  countryCodes?: string[]
   company?: {
     id: string
     name: string
@@ -696,6 +730,8 @@ export async function getTeams() {
 export type CreateTeamPayload = {
   name: string
   companyId: string
+  countryPolicyMode?: TeamCountryPolicyMode
+  countryCodes?: string[]
 }
 
 export async function createTeam(payload: CreateTeamPayload) {
@@ -708,6 +744,8 @@ export async function createTeam(payload: CreateTeamPayload) {
 export type UpdateTeamPayload = {
   name?: string
   companyId?: string
+  countryPolicyMode?: TeamCountryPolicyMode
+  countryCodes?: string[]
 }
 
 export async function updateTeam(id: string, payload: UpdateTeamPayload) {

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { CountryAccessService } from '../country-access/country-access.service';
 import { PrismaService } from '../database/prisma.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
@@ -18,12 +19,17 @@ type CompanyRecord = {
 
 @Injectable()
 export class CompaniesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly countryAccessService: CountryAccessService,
+  ) {}
 
-  findAll() {
-    return this.prisma.company.findMany({
+  async findAll() {
+    const companies = await this.prisma.company.findMany({
       orderBy: { createdAt: 'desc' },
     });
+
+    return Promise.all(companies.map((company) => this.withCountryCodes(company)));
   }
 
   async findOne(id: string) {
@@ -33,16 +39,34 @@ export class CompaniesService {
       throw new NotFoundException(`Company with id "${id}" not found`);
     }
 
-    return company;
+    return this.withCountryCodes(company);
   }
 
   async create(dto: CreateCompanyDto, actorUserId: string) {
+    const normalizedCountryCodes =
+      dto.countryCodes !== undefined
+        ? await this.countryAccessService.validateCountryCodes(dto.countryCodes)
+        : [];
+
     try {
-      const company = await this.prisma.company.create({
-        data: {
-          name: dto.name,
-          code: dto.code,
-        },
+      const company = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.company.create({
+          data: {
+            name: dto.name,
+            code: dto.code,
+          },
+        });
+
+        if (normalizedCountryCodes.length > 0) {
+          await tx.companyCountry.createMany({
+            data: normalizedCountryCodes.map((countryCode) => ({
+              companyId: created.id,
+              countryCode,
+            })),
+          });
+        }
+
+        return created;
       });
 
       await this.prisma.auditLog.create({
@@ -52,11 +76,28 @@ export class CompaniesService {
           targetId: company.id,
           actorUserId,
           companyId: company.id,
-          afterData: this.toAuditData(company),
+          afterData: {
+            ...this.toAuditData(company),
+            countryCodes: normalizedCountryCodes,
+          },
         },
       });
 
-      return company;
+      if (dto.countryCodes !== undefined) {
+        await this.prisma.auditLog.create({
+          data: {
+            action: 'company.country.update',
+            targetType: 'Company',
+            targetId: company.id,
+            actorUserId,
+            companyId: company.id,
+            beforeData: { countryCodes: [] },
+            afterData: { countryCodes: normalizedCountryCodes },
+          },
+        });
+      }
+
+      return this.withCountryCodes(company);
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         throw new ConflictException(
@@ -75,6 +116,9 @@ export class CompaniesService {
       throw new NotFoundException(`Company with id "${id}" not found`);
     }
 
+    const beforeCountryCodes =
+      await this.countryAccessService.getCompanyAllowedCountries(id);
+
     const company = await this.prisma.company.update({
       where: { id },
       data: {
@@ -83,19 +127,67 @@ export class CompaniesService {
       },
     });
 
-    await this.prisma.auditLog.create({
-      data: {
-        action: 'company.update',
-        targetType: 'Company',
-        targetId: company.id,
-        actorUserId,
-        companyId: company.id,
-        beforeData: this.toAuditData(existing),
-        afterData: this.toAuditData(company),
-      },
-    });
+    let afterCountryCodes = beforeCountryCodes;
 
-    return company;
+    if (dto.countryCodes !== undefined) {
+      afterCountryCodes = await this.countryAccessService.validateCountryCodes(
+        dto.countryCodes,
+      );
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.companyCountry.deleteMany({ where: { companyId: id } });
+
+        if (afterCountryCodes.length > 0) {
+          await tx.companyCountry.createMany({
+            data: afterCountryCodes.map((countryCode) => ({
+              companyId: id,
+              countryCode,
+            })),
+          });
+        }
+      });
+
+      await this.prisma.auditLog.create({
+        data: {
+          action: 'company.country.update',
+          targetType: 'Company',
+          targetId: company.id,
+          actorUserId,
+          companyId: company.id,
+          beforeData: { countryCodes: beforeCountryCodes },
+          afterData: { countryCodes: afterCountryCodes },
+        },
+      });
+    }
+
+    if (dto.name !== undefined || dto.status !== undefined) {
+      await this.prisma.auditLog.create({
+        data: {
+          action: 'company.update',
+          targetType: 'Company',
+          targetId: company.id,
+          actorUserId,
+          companyId: company.id,
+          beforeData: this.toAuditData(existing),
+          afterData: this.toAuditData(company),
+        },
+      });
+    }
+
+    return {
+      ...company,
+      countryCodes: afterCountryCodes,
+    };
+  }
+
+  private async withCountryCodes(company: CompanyRecord) {
+    const countryCodes =
+      await this.countryAccessService.getCompanyAllowedCountries(company.id);
+
+    return {
+      ...company,
+      countryCodes,
+    };
   }
 
   private toAuditData(company: CompanyRecord) {

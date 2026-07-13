@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { CountryAccessService } from '../country-access/country-access.service';
 import { PrismaService } from '../database/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
@@ -17,6 +18,7 @@ type OrderRecord = {
   id: string;
   companyId: string;
   userId: string | null;
+  teamId: string | null;
   serviceId: string;
   providerId: string;
   phoneResourceId: string;
@@ -76,10 +78,16 @@ const userSelect = {
   displayName: true,
 } as const;
 
+const teamSelect = {
+  id: true,
+  name: true,
+} as const;
+
 const orderSelect = {
   id: true,
   companyId: true,
   userId: true,
+  teamId: true,
   serviceId: true,
   providerId: true,
   phoneResourceId: true,
@@ -92,11 +100,15 @@ const orderSelect = {
   provider: { select: providerSelect },
   phoneResource: { select: phoneResourceSelect },
   user: { select: userSelect },
+  team: { select: teamSelect },
 } as const;
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly countryAccessService: CountryAccessService,
+  ) {}
 
   async findAll(query: ListOrdersQueryDto) {
     const page = query.page ?? 1;
@@ -180,7 +192,13 @@ export class OrdersService {
       );
     }
 
-    await this.validateCreateRelations(dto);
+    const { teamId, countryCode } = await this.validateCreateRelations(dto);
+
+    await this.countryAccessService.assertCountryAllowed(
+      dto.companyId,
+      teamId,
+      countryCode,
+    );
 
     const order = await this.prisma.$transaction(async (tx) => {
       const lockResult = await tx.phoneResource.updateMany({
@@ -203,6 +221,7 @@ export class OrdersService {
         data: {
           companyId: dto.companyId,
           userId: dto.userId || null,
+          teamId,
           serviceId: dto.serviceId,
           providerId: dto.providerId,
           phoneResourceId: dto.phoneResourceId,
@@ -349,6 +368,7 @@ export class OrdersService {
         companyId: true,
         providerId: true,
         status: true,
+        country: true,
       },
     });
 
@@ -374,10 +394,18 @@ export class OrdersService {
       throw new ConflictException('Phone resource is not available');
     }
 
+    const countryCode = phoneResource.country?.trim().toUpperCase();
+
+    if (!countryCode) {
+      throw new BadRequestException('Phone resource country is required');
+    }
+
+    let teamId: string | null = null;
+
     if (dto.userId) {
       const user = await this.prisma.user.findUnique({
         where: { id: dto.userId },
-        select: { id: true, companyId: true },
+        select: { id: true, companyId: true, teamId: true },
       });
 
       if (!user) {
@@ -387,7 +415,11 @@ export class OrdersService {
       if (user.companyId !== dto.companyId) {
         throw new BadRequestException('User must belong to the order company');
       }
+
+      teamId = user.teamId ?? null;
     }
+
+    return { teamId, countryCode };
   }
 
   private resolvePhoneStatus(status: TerminalOrderStatus) {
@@ -410,6 +442,7 @@ export class OrdersService {
       id: order.id,
       companyId: order.companyId,
       userId: order.userId,
+      teamId: order.teamId,
       serviceId: order.serviceId,
       providerId: order.providerId,
       phoneResourceId: order.phoneResourceId,

@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
-import { createCompany, getCompanies, updateCompany } from '../api/http'
-import type { Company, CompanyStatus } from '../api/http'
+import {
+  createCompany,
+  getCompanies,
+  getCountries,
+  updateCompany,
+} from '../api/http'
+import type { Company, CompanyStatus, Country } from '../api/http'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 
@@ -24,8 +29,26 @@ function formatDate(value?: string) {
   })
 }
 
+function formatCountrySummary(codes: string[] | undefined, countries: Country[]) {
+  if (!codes || codes.length === 0) {
+    return '未开放（无法创建订单）'
+  }
+
+  const labels = codes.map((code) => {
+    const country = countries.find((item) => item.code === code)
+    return country ? country.nameZh : code
+  })
+
+  if (labels.length <= 3) {
+    return labels.join('、')
+  }
+
+  return `${labels.slice(0, 3).join('、')} 等 ${labels.length} 个`
+}
+
 export function CompanyPage() {
   const [companies, setCompanies] = useState<Company[]>([])
+  const [countries, setCountries] = useState<Country[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -34,6 +57,7 @@ export function CompanyPage() {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [status, setStatus] = useState<CompanyStatus>('ACTIVE')
+  const [countryCodes, setCountryCodes] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -44,8 +68,12 @@ export function CompanyPage() {
     setError('')
 
     try {
-      const result = await getCompanies()
-      setCompanies(result)
+      const [companyResult, countryResult] = await Promise.all([
+        getCompanies(),
+        getCountries(),
+      ])
+      setCompanies(companyResult)
+      setCountries(countryResult)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载公司列表失败')
     } finally {
@@ -62,6 +90,7 @@ export function CompanyPage() {
     setName('')
     setCode('')
     setStatus('ACTIVE')
+    setCountryCodes([])
     setFormError('')
     setModalOpen(true)
   }
@@ -71,6 +100,7 @@ export function CompanyPage() {
     setName(company.name)
     setCode(company.code)
     setStatus(company.status)
+    setCountryCodes(company.countryCodes || [])
     setFormError('')
     setModalOpen(true)
   }
@@ -81,6 +111,14 @@ export function CompanyPage() {
     }
 
     setModalOpen(false)
+  }
+
+  function toggleCountryCode(code: string) {
+    setCountryCodes((current) =>
+      current.includes(code)
+        ? current.filter((item) => item !== code)
+        : [...current, code].sort(),
+    )
   }
 
   async function handleSubmitCompany() {
@@ -106,11 +144,13 @@ export function CompanyPage() {
           name: trimmedName,
           code: trimmedCode,
           status,
+          countryCodes,
         })
       } else {
         await createCompany({
           name: trimmedName,
           code: trimmedCode,
+          countryCodes,
         })
       }
 
@@ -158,6 +198,7 @@ export function CompanyPage() {
             <tr>
               <th>公司名称</th>
               <th>公司编码</th>
+              <th>开放国家/地区</th>
               <th>状态</th>
               <th>创建时间</th>
               <th>操作</th>
@@ -167,13 +208,14 @@ export function CompanyPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5}>正在加载公司列表...</td>
+                <td colSpan={6}>正在加载公司列表...</td>
               </tr>
             ) : companies.length > 0 ? (
               companies.map((company) => (
                 <tr key={company.id}>
                   <td>{company.name}</td>
                   <td>{company.code}</td>
+                  <td>{formatCountrySummary(company.countryCodes, countries)}</td>
                   <td>
                     <StatusBadge status={company.status} />
                   </td>
@@ -191,7 +233,7 @@ export function CompanyPage() {
               ))
             ) : (
               <tr>
-                <td colSpan={5}>暂无公司数据</td>
+                <td colSpan={6}>暂无公司数据</td>
               </tr>
             )}
           </tbody>
@@ -236,11 +278,40 @@ export function CompanyPage() {
                 <select
                   value={status}
                   onChange={(event) => setStatus(event.target.value as CompanyStatus)}
+                  disabled={!isEditing}
                 >
                   <option value="ACTIVE">启用</option>
                   <option value="DISABLED">停用</option>
                 </select>
               </label>
+
+              <div className="form-field">
+                <span>开放国家/地区</span>
+                <div className="checkbox-grid">
+                  {countries.map((country) => (
+                    <label key={country.code} className="checkbox-option">
+                      <input
+                        type="checkbox"
+                        checked={countryCodes.includes(country.code)}
+                        onChange={() => toggleCountryCode(country.code)}
+                      />
+                      <span>
+                        {country.emoji ? `${country.emoji} ` : ''}
+                        {country.nameZh}（{country.code}）
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {countryCodes.length === 0 ? (
+                  <p className="form-hint form-hint-warning">
+                    未选择开放国家/地区时，该公司无法创建订单。
+                  </p>
+                ) : (
+                  <p className="form-hint">
+                    已选择 {countryCodes.length} 个国家/地区。
+                  </p>
+                )}
+              </div>
 
               {formError ? <div className="form-error">{formError}</div> : null}
             </div>

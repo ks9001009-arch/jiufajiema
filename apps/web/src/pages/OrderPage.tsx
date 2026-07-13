@@ -3,6 +3,8 @@ import {
   createOrder,
   createOrderSms,
   getCompanies,
+  getCountries,
+  getEffectiveCountries,
   getOrders,
   getPhoneResources,
   getProviders,
@@ -13,6 +15,7 @@ import {
 import type {
   AdminUser,
   Company,
+  Country,
   Order,
   OrderStatus,
   PhoneResource,
@@ -108,6 +111,8 @@ export function OrderPage() {
   const [providers, setProviders] = useState<Provider[]>([])
   const [phoneResources, setPhoneResources] = useState<PhoneResource[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [countries, setCountries] = useState<Country[]>([])
+  const [effectiveCountries, setEffectiveCountries] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [filters, setFilters] = useState<OrderFilterState>(emptyOrderFilters)
@@ -135,6 +140,10 @@ export function OrderPage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
+  const effectiveCountrySet = new Set(
+    effectiveCountries.map((code) => code.toUpperCase()),
+  )
+
   const availableServices = services.filter(
     (service) => service.companyId === companyId,
   )
@@ -147,7 +156,9 @@ export function OrderPage() {
     (resource) =>
       resource.companyId === companyId &&
       resource.providerId === providerId &&
-      resource.status === 'AVAILABLE',
+      resource.status === 'AVAILABLE' &&
+      resource.country &&
+      effectiveCountrySet.has(resource.country.toUpperCase()),
   )
   const availableUsers = users.filter((user) => user.companyId === companyId)
 
@@ -171,6 +182,36 @@ export function OrderPage() {
   const filterUsers = users.filter(
     (user) => !filters.companyId || user.companyId === filters.companyId,
   )
+
+  function resolveCountryLabel(code?: string | null) {
+    if (!code) {
+      return '-'
+    }
+
+    const normalized = code.toUpperCase()
+    const country = countries.find((item) => item.code === normalized)
+    return country?.nameZh || getCountryLabel(normalized)
+  }
+
+  async function refreshEffectiveCountries(
+    nextCompanyId: string,
+    nextUserId: string,
+  ) {
+    if (!nextCompanyId) {
+      setEffectiveCountries([])
+      return
+    }
+
+    const selectedUser = users.find((user) => user.id === nextUserId)
+    const teamId = selectedUser?.teamId || null
+
+    try {
+      const result = await getEffectiveCountries(nextCompanyId, teamId)
+      setEffectiveCountries(result)
+    } catch {
+      setEffectiveCountries([])
+    }
+  }
 
   async function loadOrders(
     nextFilters = filters,
@@ -201,7 +242,7 @@ export function OrderPage() {
     setError('')
 
     try {
-      const [orderResult, companyResult, serviceResult, providerResult, phoneResourceResult, userResult] =
+      const [orderResult, companyResult, serviceResult, providerResult, phoneResourceResult, userResult, countryResult] =
         await Promise.all([
           getOrders({ page: 1, pageSize: 20 }),
           getCompanies(),
@@ -209,6 +250,7 @@ export function OrderPage() {
           getProviders(),
           getPhoneResources(),
           getUsers(),
+          getCountries(),
         ])
 
       setOrders(orderResult.items)
@@ -221,6 +263,7 @@ export function OrderPage() {
       setProviders(providerResult)
       setPhoneResources(phoneResourceResult)
       setUsers(userResult)
+      setCountries(countryResult)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载订单失败')
     } finally {
@@ -232,6 +275,33 @@ export function OrderPage() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    if (!createModalOpen || !companyId) {
+      return
+    }
+
+    void refreshEffectiveCountries(companyId, userId)
+  }, [createModalOpen, companyId, userId, users])
+
+  useEffect(() => {
+    if (!createModalOpen) {
+      return
+    }
+
+    if (availablePhoneResources.length === 0) {
+      setPhoneResourceId('')
+      return
+    }
+
+    const stillValid = availablePhoneResources.some(
+      (resource) => resource.id === phoneResourceId,
+    )
+
+    if (!stillValid) {
+      setPhoneResourceId(availablePhoneResources[0]?.id || '')
+    }
+  }, [createModalOpen, availablePhoneResources, phoneResourceId])
+
   function resetCreateForm() {
     const initialCompanyId = companies[0]?.id || ''
     const initialService = services.find(
@@ -242,17 +312,11 @@ export function OrderPage() {
         provider.companyId === initialCompanyId &&
         provider.services.some((service) => service.id === initialService?.id),
     )
-    const initialPhone = phoneResources.find(
-      (resource) =>
-        resource.companyId === initialCompanyId &&
-        resource.providerId === initialProvider?.id &&
-        resource.status === 'AVAILABLE',
-    )
 
     setCompanyId(initialCompanyId)
     setServiceId(initialService?.id || '')
     setProviderId(initialProvider?.id || '')
-    setPhoneResourceId(initialPhone?.id || '')
+    setPhoneResourceId('')
     setUserId('')
     setAmount('')
     setFormError('')
@@ -313,17 +377,11 @@ export function OrderPage() {
         provider.companyId === nextCompanyId &&
         provider.services.some((service) => service.id === nextService?.id),
     )
-    const nextPhone = phoneResources.find(
-      (resource) =>
-        resource.companyId === nextCompanyId &&
-        resource.providerId === nextProvider?.id &&
-        resource.status === 'AVAILABLE',
-    )
 
     setCompanyId(nextCompanyId)
     setServiceId(nextService?.id || '')
     setProviderId(nextProvider?.id || '')
-    setPhoneResourceId(nextPhone?.id || '')
+    setPhoneResourceId('')
     setUserId('')
   }
 
@@ -333,28 +391,20 @@ export function OrderPage() {
         provider.companyId === companyId &&
         provider.services.some((service) => service.id === nextServiceId),
     )
-    const nextPhone = phoneResources.find(
-      (resource) =>
-        resource.companyId === companyId &&
-        resource.providerId === nextProvider?.id &&
-        resource.status === 'AVAILABLE',
-    )
 
     setServiceId(nextServiceId)
     setProviderId(nextProvider?.id || '')
-    setPhoneResourceId(nextPhone?.id || '')
+    setPhoneResourceId('')
   }
 
   function handleProviderChange(nextProviderId: string) {
-    const nextPhone = phoneResources.find(
-      (resource) =>
-        resource.companyId === companyId &&
-        resource.providerId === nextProviderId &&
-        resource.status === 'AVAILABLE',
-    )
-
     setProviderId(nextProviderId)
-    setPhoneResourceId(nextPhone?.id || '')
+    setPhoneResourceId('')
+  }
+
+  function handleUserChange(nextUserId: string) {
+    setUserId(nextUserId)
+    setPhoneResourceId('')
   }
 
   function handleFilterCompanyChange(nextCompanyId: string) {
@@ -525,10 +575,7 @@ export function OrderPage() {
           {order.phoneResource?.country ? (
             <span className="table-meta">
               {' '}
-              ({getCountryLabel(
-                order.phoneResource.country,
-                order.phoneResource.region,
-              )})
+              ({resolveCountryLabel(order.phoneResource.country)})
             </span>
           ) : null}
         </>
@@ -856,7 +903,7 @@ export function OrderPage() {
                     <option key={resource.id} value={resource.id}>
                       {resource.phone}
                       {resource.country
-                        ? ` (${getCountryLabel(resource.country, resource.region)})`
+                        ? ` (${resolveCountryLabel(resource.country)})`
                         : ''}
                     </option>
                   ))}
@@ -867,7 +914,7 @@ export function OrderPage() {
                 <span>用户（可选）</span>
                 <select
                   value={userId}
-                  onChange={(event) => setUserId(event.target.value)}
+                  onChange={(event) => handleUserChange(event.target.value)}
                 >
                   <option value="">不指定用户</option>
                   {availableUsers.map((user) => (

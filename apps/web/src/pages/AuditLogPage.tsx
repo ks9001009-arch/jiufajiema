@@ -39,8 +39,10 @@ function getActionText(action: string) {
   const map: Record<string, string> = {
     'company.create': '新增公司',
     'company.update': '编辑公司',
+    'company.country.update': '公司开放国家变更',
     'team.create': '新增团队',
     'team.update': '编辑团队',
+    'team.countryPolicy.update': '团队国家策略变更',
     'role.create': '新增角色',
     'role.update': '编辑角色',
     'user.create': '新增用户',
