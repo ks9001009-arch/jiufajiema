@@ -18,8 +18,11 @@ import type {
   Provider,
   Service,
 } from '../api/http'
+import { DataTable, type DataTableColumn } from '../components/DataTable'
 import { PageHeader } from '../components/PageHeader'
+import { Pagination } from '../components/Pagination'
 import { StatusBadge } from '../components/StatusBadge'
+import { TableToolbar } from '../components/TableToolbar'
 import { getCountryLabel } from '../utils/country'
 
 const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -367,22 +370,6 @@ export function OrderPage() {
     loadOrders(filters, 1, nextPageSize)
   }
 
-  function handlePreviousPage() {
-    if (page <= 1) {
-      return
-    }
-
-    loadOrders(filters, page - 1, pageSize)
-  }
-
-  function handleNextPage() {
-    if (page >= totalPages) {
-      return
-    }
-
-    loadOrders(filters, page + 1, pageSize)
-  }
-
   async function handleCreateOrder() {
     const trimmedAmount = amount.trim()
 
@@ -453,6 +440,85 @@ export function OrderPage() {
     }
   }
 
+  const orderColumns: DataTableColumn<Order>[] = [
+    {
+      key: 'id',
+      header: '订单 ID',
+      render: (order) => `${order.id.slice(0, 8)}...`,
+    },
+    {
+      key: 'company',
+      header: '公司',
+      render: (order) => order.company?.name || '-',
+    },
+    {
+      key: 'service',
+      header: '服务',
+      render: (order) => order.service?.name || '-',
+    },
+    {
+      key: 'provider',
+      header: '供应商',
+      render: (order) => order.provider?.name || '-',
+    },
+    {
+      key: 'phone',
+      header: '号码',
+      render: (order) => (
+        <>
+          {order.phoneResource?.phone || '-'}
+          {order.phoneResource?.country ? (
+            <span className="table-meta">
+              {' '}
+              ({getCountryLabel(
+                order.phoneResource.country,
+                order.phoneResource.region,
+              )})
+            </span>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      key: 'user',
+      header: '用户',
+      render: (order) => order.user?.displayName || order.user?.username || '-',
+    },
+    {
+      key: 'status',
+      header: '状态',
+      render: (order) => (
+        <StatusBadge status={order.status} labelMap={ORDER_STATUS_LABELS} />
+      ),
+    },
+    {
+      key: 'amount',
+      header: '金额',
+      render: (order) => order.amount,
+    },
+    {
+      key: 'createdAt',
+      header: '创建时间',
+      render: (order) => formatDate(order.createdAt),
+    },
+    {
+      key: 'actions',
+      header: '操作',
+      render: (order) =>
+        order.status === 'WAIT_SMS' ? (
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => openStatusModal(order)}
+          >
+            变更状态
+          </button>
+        ) : (
+          '-'
+        ),
+    },
+  ]
+
   return (
     <div className="manage-page">
       <PageHeader
@@ -475,8 +541,19 @@ export function OrderPage() {
         }
       />
 
-      <section className="panel-card filter-panel">
-        <div className="filter-grid">
+      <TableToolbar
+        actions={
+          <>
+            <button className="secondary-button" type="button" onClick={handleResetFilters}>
+              重置
+            </button>
+
+            <button className="primary-button" type="button" onClick={handleSearch}>
+              查询
+            </button>
+          </>
+        }
+      >
           <label>
             <span>公司</span>
             <select
@@ -608,18 +685,7 @@ export function OrderPage() {
               }
             />
           </label>
-        </div>
-
-        <div className="filter-actions">
-          <button className="secondary-button" type="button" onClick={handleResetFilters}>
-            重置
-          </button>
-
-          <button className="primary-button" type="button" onClick={handleSearch}>
-            查询
-          </button>
-        </div>
-      </section>
+      </TableToolbar>
 
       <section className="panel-card">
         <div className="table-toolbar">
@@ -631,120 +697,24 @@ export function OrderPage() {
 
         {error ? <div className="table-error">{error}</div> : null}
 
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>订单 ID</th>
-              <th>公司</th>
-              <th>服务</th>
-              <th>供应商</th>
-              <th>号码</th>
-              <th>用户</th>
-              <th>状态</th>
-              <th>金额</th>
-              <th>创建时间</th>
-              <th>操作</th>
-            </tr>
-          </thead>
+        <DataTable
+          columns={orderColumns}
+          rows={orders}
+          rowKey={(order) => order.id}
+          loading={loading}
+          loadingText="正在加载订单..."
+          emptyText="暂无订单"
+        />
 
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={10}>正在加载订单...</td>
-              </tr>
-            ) : orders.length > 0 ? (
-              orders.map((order) => (
-                <tr key={order.id}>
-                  <td>{order.id.slice(0, 8)}...</td>
-                  <td>{order.company?.name || '-'}</td>
-                  <td>{order.service?.name || '-'}</td>
-                  <td>{order.provider?.name || '-'}</td>
-                  <td>
-                    {order.phoneResource?.phone || '-'}
-                    {order.phoneResource?.country ? (
-                      <span className="table-meta">
-                        {' '}
-                        ({getCountryLabel(
-                          order.phoneResource.country,
-                          order.phoneResource.region,
-                        )})
-                      </span>
-                    ) : null}
-                  </td>
-                  <td>
-                    {order.user?.displayName || order.user?.username || '-'}
-                  </td>
-                  <td>
-                    <StatusBadge
-                      status={order.status}
-                      labelMap={ORDER_STATUS_LABELS}
-                    />
-                  </td>
-                  <td>{order.amount}</td>
-                  <td>{formatDate(order.createdAt)}</td>
-                  <td>
-                    {order.status === 'WAIT_SMS' ? (
-                      <button
-                        className="text-button"
-                        type="button"
-                        onClick={() => openStatusModal(order)}
-                      >
-                        变更状态
-                      </button>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={10}>暂无订单</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-
-        <div className="pagination-bar">
-          <span className="pagination-summary">共 {total} 条记录</span>
-
-          <div className="pagination-controls">
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={handlePreviousPage}
-              disabled={loading || total === 0 || page <= 1}
-            >
-              上一页
-            </button>
-
-            <span className="pagination-status">
-              {total === 0 ? '第 0 / 0 页' : `第 ${page} / ${totalPages} 页`}
-            </span>
-
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={handleNextPage}
-              disabled={loading || total === 0 || page >= totalPages}
-            >
-              下一页
-            </button>
-
-            <select
-              className="pagination-size"
-              value={pageSize}
-              onChange={(event) =>
-                handlePageSizeChange(Number(event.target.value))
-              }
-              disabled={loading}
-            >
-              <option value={20}>每页 20 条</option>
-              <option value={50}>每页 50 条</option>
-              <option value={100}>每页 100 条</option>
-            </select>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          totalPages={totalPages}
+          onPageChange={(nextPage) => loadOrders(filters, nextPage, pageSize)}
+          onPageSizeChange={handlePageSizeChange}
+          disabled={loading}
+        />
       </section>
 
       {createModalOpen ? (
