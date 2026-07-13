@@ -19,6 +19,7 @@ import { ServicePage } from './pages/ServicePage'
 import { SmsPage } from './pages/SmsPage'
 import { TeamPage } from './pages/TeamPage'
 import { UserPage } from './pages/UserPage'
+import { WalletPage } from './pages/WalletPage'
 const PAGE_PERMISSIONS: Record<AdminPageKey, string> = {
   dashboard: 'user.read',
   companies: 'company.read',
@@ -30,6 +31,7 @@ const PAGE_PERMISSIONS: Record<AdminPageKey, string> = {
   phoneResources: 'phoneResource.read',
   orders: 'order.read',
   sms: 'sms.read',
+  wallets: 'wallet.read',
   auditLogs: 'audit.read',
 }
 
@@ -131,6 +133,8 @@ useEffect(() => {
         return <OrderPage />
       case 'sms':
         return <SmsPage />
+      case 'wallets':
+        return <WalletPage />
       case 'auditLogs':
         return <AuditLogPage />
       case 'dashboard':

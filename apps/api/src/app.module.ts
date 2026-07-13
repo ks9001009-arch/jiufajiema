@@ -15,6 +15,7 @@ import { RolesModule } from './roles/roles.module';
 import { ServicesModule } from './services/services.module';
 import { TeamsModule } from './teams/teams.module';
 import { UsersModule } from './users/users.module';
+import { WalletsModule } from './wallets/wallets.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { UsersModule } from './users/users.module';
     PhoneResourcesModule,
     OrdersModule,
     SmsModule,
+    WalletsModule,
     RolesModule,
     UsersModule,
     AuditLogsModule,

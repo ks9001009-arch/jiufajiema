@@ -874,6 +874,151 @@ export async function resetUserPassword(id: string, password: string) {
     body: JSON.stringify({ password }),
   })
 }
+
+export type WalletAccountStatus = 'ACTIVE' | 'DISABLED'
+
+export type WalletTransactionType =
+  | 'RECHARGE'
+  | 'MANUAL_CREDIT'
+  | 'MANUAL_DEBIT'
+  | 'FREEZE'
+  | 'RELEASE'
+  | 'CAPTURE'
+  | 'REFUND'
+
+export type WalletAccount = {
+  id: string
+  companyId: string
+  userId?: string | null
+  currency: string
+  availableBalance: string
+  frozenBalance: string
+  status: WalletAccountStatus
+  version: number
+  company?: {
+    id: string
+    name: string
+    code?: string
+  } | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type WalletTransaction = {
+  id: string
+  walletAccountId: string
+  companyId: string
+  type: WalletTransactionType
+  amount: string
+  availableBefore: string
+  availableAfter: string
+  frozenBefore: string
+  frozenAfter: string
+  referenceType?: string | null
+  referenceId?: string | null
+  idempotencyKey: string
+  actorUserId?: string | null
+  remark?: string | null
+  createdAt?: string
+}
+
+export type WalletMutationResult = {
+  idempotent: boolean
+  account: WalletAccount
+  transaction: WalletTransaction
+}
+
+export type WalletTransactionListResult = {
+  items: WalletTransaction[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export async function getWalletAccounts(companyId?: string) {
+  const search = companyId ? `?companyId=${encodeURIComponent(companyId)}` : ''
+  const response = await request<ListResponse<WalletAccount>>(
+    `/wallet-accounts${search}`,
+  )
+  return normalizeList(response)
+}
+
+export async function getWalletAccount(id: string) {
+  return request<WalletAccount>(`/wallet-accounts/${id}`)
+}
+
+export async function getWalletTransactions(
+  walletAccountId: string,
+  params?: { page?: number; pageSize?: number },
+) {
+  const search = new URLSearchParams()
+
+  if (params?.page) {
+    search.set('page', String(params.page))
+  }
+
+  if (params?.pageSize) {
+    search.set('pageSize', String(params.pageSize))
+  }
+
+  const query = search.toString()
+  return request<WalletTransactionListResult>(
+    `/wallet-accounts/${walletAccountId}/transactions${query ? `?${query}` : ''}`,
+  )
+}
+
+export type CreateWalletAccountPayload = {
+  companyId: string
+  currency: string
+}
+
+export async function createWalletAccount(payload: CreateWalletAccountPayload) {
+  return request<WalletAccount>('/wallet-accounts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export type RechargeWalletAccountPayload = {
+  amount: string
+  idempotencyKey: string
+  remark?: string
+}
+
+export async function rechargeWalletAccount(
+  walletAccountId: string,
+  payload: RechargeWalletAccountPayload,
+) {
+  return request<WalletMutationResult>(
+    `/wallet-accounts/${walletAccountId}/recharge`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
+}
+
+export type AdjustWalletAccountPayload = {
+  direction: 'CREDIT' | 'DEBIT'
+  amount: string
+  idempotencyKey: string
+  remark: string
+}
+
+export async function adjustWalletAccount(
+  walletAccountId: string,
+  payload: AdjustWalletAccountPayload,
+) {
+  return request<WalletMutationResult>(
+    `/wallet-accounts/${walletAccountId}/adjustments`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
+}
+
 export type AuditLog = {
   id: string
   actorUserId?: string | null

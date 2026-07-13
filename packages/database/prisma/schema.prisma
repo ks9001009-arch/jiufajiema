@@ -34,6 +34,8 @@ model Company {
   phoneResources PhoneResource[]
   orders         Order[]
   countries      CompanyCountry[]
+  walletAccounts WalletAccount[]
+  walletTransactions WalletTransaction[]
 }
 
 model Team {
@@ -79,6 +81,8 @@ model User {
 
   auditLogs AuditLog[]
   orders    Order[]
+  walletAccounts          WalletAccount[]     @relation("WalletAccountOwner")
+  actedWalletTransactions WalletTransaction[] @relation("WalletTransactionActor")
 }
 
 model AuditLog {
@@ -295,4 +299,81 @@ model Sms {
   createdAt DateTime @default(now())
 
   @@index([orderId])
+}
+
+enum WalletAccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum WalletTransactionType {
+  RECHARGE
+  MANUAL_CREDIT
+  MANUAL_DEBIT
+  FREEZE
+  RELEASE
+  CAPTURE
+  REFUND
+}
+
+model WalletAccount {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  userId String?
+  user   User?   @relation("WalletAccountOwner", fields: [userId], references: [id])
+
+  currency String
+
+  availableBalance Decimal @default(0) @db.Decimal(18, 4)
+  frozenBalance    Decimal @default(0) @db.Decimal(18, 4)
+
+  status WalletAccountStatus @default(ACTIVE)
+
+  version Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions WalletTransaction[]
+
+  @@index([companyId])
+  @@index([userId])
+}
+
+model WalletTransaction {
+  id String @id @default(uuid())
+
+  walletAccountId String
+  walletAccount   WalletAccount @relation(fields: [walletAccountId], references: [id])
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  type WalletTransactionType
+
+  amount Decimal @db.Decimal(18, 4)
+
+  availableBefore Decimal @db.Decimal(18, 4)
+  availableAfter  Decimal @db.Decimal(18, 4)
+  frozenBefore    Decimal @db.Decimal(18, 4)
+  frozenAfter     Decimal @db.Decimal(18, 4)
+
+  referenceType String?
+  referenceId   String?
+
+  idempotencyKey String @unique
+
+  actorUserId String?
+  actorUser   User?   @relation("WalletTransactionActor", fields: [actorUserId], references: [id])
+
+  remark String?
+
+  createdAt DateTime @default(now())
+
+  @@index([walletAccountId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([referenceType, referenceId])
 }
