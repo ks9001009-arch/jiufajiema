@@ -125,8 +125,10 @@ model PhoneResource {
 
   orders Order[]
 
-  @@index([status])
+  @@unique([companyId, phone])
+  @@index([companyId])
   @@index([providerId])
+  @@index([status])
 }
 
 enum PhoneStatus {
@@ -223,6 +225,12 @@ model Order {
   updatedAt DateTime @updatedAt
 
   sms Sms[]
+
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([userId])
+  @@index([phoneResourceId])
+  @@index([createdAt])
 }
 
 model Sms {
