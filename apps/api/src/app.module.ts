@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './companies/companies.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { ProvidersModule } from './providers/providers.module';
 import { RolesModule } from './roles/roles.module';
 import { ServicesModule } from './services/services.module';
 import { TeamsModule } from './teams/teams.module';
@@ -16,6 +17,7 @@ import { UsersModule } from './users/users.module';
     CompaniesModule,
     TeamsModule,
     ServicesModule,
+    ProvidersModule,
     RolesModule,
     UsersModule,
     AuditLogsModule,

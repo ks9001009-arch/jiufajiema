@@ -46,6 +46,8 @@ function getActionText(action: string) {
     'user.create': '新增用户',
     'user.update': '编辑用户',
     'user.resetPassword': '重置用户密码',
+    'provider.create': '新增供应商',
+    'provider.update': '编辑供应商',
     CREATE: '新增',
     UPDATE: '编辑',
     DELETE: '删除',

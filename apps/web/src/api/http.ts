@@ -213,6 +213,72 @@ export async function updateService(id: string, payload: UpdateServicePayload) {
   })
 }
 
+export type ProviderStatus = 'ACTIVE' | 'DISABLED'
+
+export type Provider = {
+  id: string
+  companyId: string
+  name: string
+  code: string
+  adapter: string
+  status: ProviderStatus
+  company?: {
+    id: string
+    name: string
+    code?: string
+  } | null
+  services: Array<{
+    id: string
+    companyId: string
+    name: string
+    code: string
+  }>
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function getProviders() {
+  const response = await request<ListResponse<Provider>>('/providers')
+  return normalizeList(response)
+}
+
+export async function getProvider(id: string) {
+  return request<Provider>(`/providers/${id}`)
+}
+
+export type CreateProviderPayload = {
+  companyId: string
+  name: string
+  code: string
+  adapter: string
+  serviceIds?: string[]
+}
+
+export async function createProvider(payload: CreateProviderPayload) {
+  return request<Provider>('/providers', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export type UpdateProviderPayload = {
+  name?: string
+  code?: string
+  adapter?: string
+  status?: ProviderStatus
+  serviceIds?: string[]
+}
+
+export async function updateProvider(
+  id: string,
+  payload: UpdateProviderPayload,
+) {
+  return request<Provider>(`/providers/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
 export type Team = {
   id: string
   name: string

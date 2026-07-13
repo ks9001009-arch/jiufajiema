@@ -596,6 +596,37 @@ button {
   box-shadow: 0 0 0 4px rgba(37, 87, 255, 0.12);
 }
 
+.provider-service-options {
+  display: grid;
+  gap: 10px;
+  max-height: 180px;
+  margin-top: 8px;
+  padding: 12px;
+  overflow-y: auto;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+}
+
+.modal-form .provider-service-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+
+.modal-form .provider-service-options input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.provider-service-empty {
+  color: #98a2b3;
+  font-size: 14px;
+}
+
 .dashboard-error {
   margin: 0 0 18px;
 }

@@ -8,6 +8,7 @@ export type AdminPageKey =
   | 'roles'
   | 'users'
   | 'services'
+  | 'providers'
   | 'auditLogs'
 
 type AdminLayoutProps = {
@@ -45,7 +46,10 @@ const menuGroups: AdminMenuGroup[] = [
   },
   {
     title: '业务管理',
-    items: [{ key: 'services', label: '服务管理', permission: 'service.read' }],
+    items: [
+      { key: 'services', label: '服务管理', permission: 'service.read' },
+      { key: 'providers', label: '供应商管理', permission: 'provider.read' },
+    ],
   },
   {
     title: '系统审计',

@@ -11,6 +11,7 @@ import { AuditLogPage } from './pages/AuditLogPage'
 import { CompanyPage } from './pages/CompanyPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
+import { ProviderPage } from './pages/ProviderPage'
 import { RolePage } from './pages/RolePage'
 import { ServicePage } from './pages/ServicePage'
 import { TeamPage } from './pages/TeamPage'
@@ -22,6 +23,7 @@ const PAGE_PERMISSIONS: Record<AdminPageKey, string> = {
   roles: 'role.read',
   users: 'user.read',
   services: 'service.read',
+  providers: 'provider.read',
   auditLogs: 'audit.read',
 }
 
@@ -115,6 +117,8 @@ useEffect(() => {
         return <UserPage />
       case 'services':
         return <ServicePage />
+      case 'providers':
+        return <ProviderPage />
       case 'auditLogs':
         return <AuditLogPage />
       case 'dashboard':
