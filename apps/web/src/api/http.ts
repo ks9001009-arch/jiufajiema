@@ -100,6 +100,43 @@ export async function getMe() {
   return request<CurrentUser>('/auth/me')
 }
 
+export type AuditLogSummary = {
+  id: string
+  action: string
+  targetType?: string | null
+  targetId?: string | null
+  createdAt: string
+  actorUser?: {
+    id: string
+    username: string
+    displayName?: string | null
+  } | null
+  company?: {
+    id: string
+    name: string
+  } | null
+}
+
+export type DashboardStats = {
+  companyCount: number
+  teamCount: number
+  userCount: number
+  roleCount: number
+  serviceCount: number
+  providerCount: number
+  availablePhoneCount: number
+  todayOrderCount: number
+  waitingSmsOrderCount: number
+  successOrderCount: number
+  failedOrderCount: number
+  todaySmsCount: number
+  recentAuditLogs: AuditLogSummary[]
+}
+
+export async function getDashboardStats() {
+  return request<DashboardStats>('/dashboard/stats')
+}
+
 export type CompanyStatus = 'ACTIVE' | 'DISABLED'
 
 export type Company = {

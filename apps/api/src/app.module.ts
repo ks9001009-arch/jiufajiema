@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './companies/companies.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { OrdersModule } from './orders/orders.module';
@@ -17,6 +18,7 @@ import { UsersModule } from './users/users.module';
   imports: [
     DatabaseModule,
     HealthModule,
+    DashboardModule,
     CompaniesModule,
     TeamsModule,
     ServicesModule,
