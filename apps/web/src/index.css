@@ -474,9 +474,24 @@ button {
   background: #ecfdf3;
 }
 
+.status-badge-locked {
+  color: #b54708;
+  background: #fffaeb;
+}
+
+.status-badge-used {
+  color: #175cd3;
+  background: #eff8ff;
+}
+
 .status-badge-disabled {
   color: #667085;
   background: #f2f4f7;
+}
+
+.status-badge-failed {
+  color: #b42318;
+  background: #fef3f2;
 }
 
 .text-button {
@@ -485,6 +500,11 @@ button {
   color: #2557ff;
   font-weight: 700;
   background: transparent;
+}
+
+.table-meta {
+  color: #667085;
+  font-size: 13px;
 }
 
 .modal-mask {

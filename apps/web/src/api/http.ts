@@ -279,6 +279,195 @@ export async function updateProvider(
   })
 }
 
+export type PhoneResourceStatus =
+  | 'AVAILABLE'
+  | 'LOCKED'
+  | 'USED'
+  | 'EXPIRED'
+  | 'DISABLED'
+
+export type PhoneResource = {
+  id: string
+  companyId: string
+  providerId: string
+  phone: string
+  country?: string | null
+  region?: string | null
+  status: PhoneResourceStatus
+  cost: string
+  company?: {
+    id: string
+    name: string
+    code?: string
+  } | null
+  provider?: {
+    id: string
+    companyId: string
+    name: string
+    code?: string
+    status?: ProviderStatus
+  } | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function getPhoneResources() {
+  const response =
+    await request<ListResponse<PhoneResource>>('/phone-resources')
+  return normalizeList(response)
+}
+
+export async function getPhoneResource(id: string) {
+  return request<PhoneResource>(`/phone-resources/${id}`)
+}
+
+export type CreatePhoneResourcePayload = {
+  companyId: string
+  providerId: string
+  phone: string
+  country?: string | null
+  status?: PhoneResourceStatus
+  cost: string
+}
+
+export async function createPhoneResource(
+  payload: CreatePhoneResourcePayload,
+) {
+  return request<PhoneResource>('/phone-resources', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export type UpdatePhoneResourcePayload = {
+  providerId?: string
+  phone?: string
+  country?: string | null
+  status?: PhoneResourceStatus
+  cost?: string
+}
+
+export async function updatePhoneResource(
+  id: string,
+  payload: UpdatePhoneResourcePayload,
+) {
+  return request<PhoneResource>(`/phone-resources/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export type OrderStatus =
+  | 'PENDING'
+  | 'WAIT_SMS'
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'CANCELLED'
+
+export type Order = {
+  id: string
+  companyId: string
+  userId?: string | null
+  serviceId: string
+  providerId: string
+  phoneResourceId: string
+  status: OrderStatus
+  amount: string
+  company?: {
+    id: string
+    name: string
+    code?: string
+  } | null
+  service?: {
+    id: string
+    companyId: string
+    name: string
+    code?: string
+  } | null
+  provider?: {
+    id: string
+    companyId: string
+    name: string
+    code?: string
+    status?: ProviderStatus
+  } | null
+  phoneResource?: {
+    id: string
+    companyId: string
+    providerId: string
+    phone: string
+    country?: string | null
+    region?: string | null
+    status?: PhoneResourceStatus
+  } | null
+  user?: {
+    id: string
+    username: string
+    displayName?: string | null
+  } | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export async function getOrders(params?: {
+  companyId?: string
+  status?: OrderStatus
+  userId?: string
+}) {
+  const search = new URLSearchParams()
+
+  if (params?.companyId) {
+    search.set('companyId', params.companyId)
+  }
+
+  if (params?.status) {
+    search.set('status', params.status)
+  }
+
+  if (params?.userId) {
+    search.set('userId', params.userId)
+  }
+
+  const query = search.toString()
+  const path = query ? `/orders?${query}` : '/orders'
+  const response = await request<ListResponse<Order>>(path)
+  return normalizeList(response)
+}
+
+export async function getOrder(id: string) {
+  return request<Order>(`/orders/${id}`)
+}
+
+export type CreateOrderPayload = {
+  companyId: string
+  serviceId: string
+  providerId: string
+  phoneResourceId: string
+  userId?: string | null
+  amount: string
+}
+
+export async function createOrder(payload: CreateOrderPayload) {
+  return request<Order>('/orders', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export type UpdateOrderStatusPayload = {
+  status: 'SUCCESS' | 'FAILED' | 'CANCELLED'
+}
+
+export async function updateOrderStatus(
+  id: string,
+  payload: UpdateOrderStatusPayload,
+) {
+  return request<Order>(`/orders/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
 export type Team = {
   id: string
   name: string

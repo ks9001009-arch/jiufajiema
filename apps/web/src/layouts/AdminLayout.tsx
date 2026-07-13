@@ -9,6 +9,8 @@ export type AdminPageKey =
   | 'users'
   | 'services'
   | 'providers'
+  | 'phoneResources'
+  | 'orders'
   | 'auditLogs'
 
 type AdminLayoutProps = {
@@ -49,6 +51,12 @@ const menuGroups: AdminMenuGroup[] = [
     items: [
       { key: 'services', label: '服务管理', permission: 'service.read' },
       { key: 'providers', label: '供应商管理', permission: 'provider.read' },
+      {
+        key: 'phoneResources',
+        label: '号码资源',
+        permission: 'phoneResource.read',
+      },
+      { key: 'orders', label: '订单管理', permission: 'order.read' },
     ],
   },
   {
