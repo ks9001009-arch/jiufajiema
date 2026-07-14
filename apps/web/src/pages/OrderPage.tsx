@@ -834,7 +834,9 @@ export function OrderPage() {
             <div className="modal-header">
               <div>
                 <h3>新建订单</h3>
-                <p>创建后订单进入等待短信状态，并锁定所选号码。</p>
+                <p>
+                  创建后订单进入等待短信状态，锁定所选号码，并从公司钱包冻结订单金额。
+                </p>
               </div>
 
               <button

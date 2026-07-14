@@ -9,6 +9,12 @@ import {
   TERMINAL_ORDER_STATUSES,
   type OrderStatus,
 } from '../orders/dto/order.validation';
+import {
+  buildOrderWalletIdempotencyKey,
+  getOrderCurrency,
+} from '../wallets/order-currency.util';
+import { WalletLedgerService } from '../wallets/wallet-ledger.service';
+import { walletAmountToString } from '../wallets/wallet-decimal.util';
 import { CreateSmsDto } from './dto/create-sms.dto';
 import { ListSmsQueryDto } from './dto/list-sms-query.dto';
 import type { SmsStatus } from './dto/sms.validation';
@@ -70,6 +76,7 @@ const orderSelect = {
   id: true,
   companyId: true,
   status: true,
+  amount: true,
   company: { select: companySelect },
   service: { select: serviceSelect },
   provider: { select: providerSelect },
@@ -91,7 +98,10 @@ const terminalStatusSet = new Set<string>(TERMINAL_ORDER_STATUSES);
 
 @Injectable()
 export class SmsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly walletLedgerService: WalletLedgerService,
+  ) {}
 
   async findAll(query: ListSmsQueryDto) {
     const page = query.page ?? 1;
@@ -164,6 +174,7 @@ export class SmsService {
         companyId: true,
         status: true,
         phoneResourceId: true,
+        amount: true,
       },
     });
 
@@ -193,8 +204,27 @@ export class SmsService {
     }
 
     const receivedAt = dto.receivedAt ? new Date(dto.receivedAt) : new Date();
+    const orderAmount = walletAmountToString(existing.amount);
+    const orderCurrency = getOrderCurrency();
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const walletAccount = await this.walletLedgerService.resolveCompanyWallet(
+        tx,
+        existing.companyId,
+        orderCurrency,
+      );
+
+      await this.walletLedgerService.capture({
+        tx,
+        walletAccountId: walletAccount.id,
+        amount: orderAmount,
+        idempotencyKey: buildOrderWalletIdempotencyKey(orderId, 'capture'),
+        actorUserId,
+        referenceType: 'Order',
+        referenceId: orderId,
+        remark: 'Order sms success capture',
+      });
+
       const phoneUpdate = await tx.phoneResource.updateMany({
         where: {
           id: existing.phoneResourceId,

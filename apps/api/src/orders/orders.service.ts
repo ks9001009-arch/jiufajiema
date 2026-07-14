@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -6,6 +7,12 @@ import {
 } from '@nestjs/common';
 import { CountryAccessService } from '../country-access/country-access.service';
 import { PrismaService } from '../database/prisma.service';
+import {
+  buildOrderWalletIdempotencyKey,
+  getOrderCurrency,
+} from '../wallets/order-currency.util';
+import { WalletLedgerService } from '../wallets/wallet-ledger.service';
+import { walletAmountToString } from '../wallets/wallet-decimal.util';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -108,6 +115,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly countryAccessService: CountryAccessService,
+    private readonly walletLedgerService: WalletLedgerService,
   ) {}
 
   async findAll(query: ListOrdersQueryDto) {
@@ -200,7 +208,17 @@ export class OrdersService {
       countryCode,
     );
 
+    const orderId = randomUUID();
+    const orderCurrency = getOrderCurrency();
+    const orderAmount = walletAmountToString(dto.amount);
+
     const order = await this.prisma.$transaction(async (tx) => {
+      const walletAccount = await this.walletLedgerService.resolveCompanyWallet(
+        tx,
+        dto.companyId,
+        orderCurrency,
+      );
+
       const lockResult = await tx.phoneResource.updateMany({
         where: {
           id: dto.phoneResourceId,
@@ -217,8 +235,9 @@ export class OrdersService {
         );
       }
 
-      return tx.order.create({
+      const created = await tx.order.create({
         data: {
+          id: orderId,
           companyId: dto.companyId,
           userId: dto.userId || null,
           teamId,
@@ -226,21 +245,34 @@ export class OrdersService {
           providerId: dto.providerId,
           phoneResourceId: dto.phoneResourceId,
           status: 'WAIT_SMS',
-          amount: dto.amount,
+          amount: orderAmount,
         },
         select: orderSelect,
       });
-    });
 
-    await this.prisma.auditLog.create({
-      data: {
-        action: 'order.create',
-        targetType: 'Order',
-        targetId: order.id,
+      await this.walletLedgerService.freeze({
+        tx,
+        walletAccountId: walletAccount.id,
+        amount: orderAmount,
+        idempotencyKey: buildOrderWalletIdempotencyKey(orderId, 'freeze'),
         actorUserId,
-        companyId: order.companyId,
-        afterData: this.toAuditData(order),
-      },
+        referenceType: 'Order',
+        referenceId: orderId,
+        remark: 'Order create freeze',
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'order.create',
+          targetType: 'Order',
+          targetId: created.id,
+          actorUserId,
+          companyId: created.companyId,
+          afterData: this.toAuditData(created),
+        },
+      });
+
+      return created;
     });
 
     return this.toResponse(order);
@@ -274,8 +306,40 @@ export class OrdersService {
       dto.status === 'SUCCESS' ? 'order.force_success' : 'order.status';
 
     const nextPhoneStatus = this.resolvePhoneStatus(dto.status);
+    const orderAmount = walletAmountToString(existing.amount);
+    const orderCurrency = getOrderCurrency();
 
     const order = await this.prisma.$transaction(async (tx) => {
+      const walletAccount = await this.walletLedgerService.resolveCompanyWallet(
+        tx,
+        existing.companyId,
+        orderCurrency,
+      );
+
+      if (dto.status === 'SUCCESS') {
+        await this.walletLedgerService.capture({
+          tx,
+          walletAccountId: walletAccount.id,
+          amount: orderAmount,
+          idempotencyKey: buildOrderWalletIdempotencyKey(id, 'capture'),
+          actorUserId,
+          referenceType: 'Order',
+          referenceId: id,
+          remark: 'Order force success capture',
+        });
+      } else {
+        await this.walletLedgerService.release({
+          tx,
+          walletAccountId: walletAccount.id,
+          amount: orderAmount,
+          idempotencyKey: buildOrderWalletIdempotencyKey(id, 'release'),
+          actorUserId,
+          referenceType: 'Order',
+          referenceId: id,
+          remark: `Order ${dto.status.toLowerCase()} release`,
+        });
+      }
+
       const phoneUpdate = await tx.phoneResource.updateMany({
         where: {
           id: existing.phoneResourceId,
@@ -292,25 +356,27 @@ export class OrdersService {
         );
       }
 
-      return tx.order.update({
+      const updated = await tx.order.update({
         where: { id },
         data: {
           status: dto.status,
         },
         select: orderSelect,
       });
-    });
 
-    await this.prisma.auditLog.create({
-      data: {
-        action: auditAction,
-        targetType: 'Order',
-        targetId: order.id,
-        actorUserId,
-        companyId: order.companyId,
-        beforeData: { status: existing.status },
-        afterData: { status: order.status },
-      },
+      await tx.auditLog.create({
+        data: {
+          action: auditAction,
+          targetType: 'Order',
+          targetId: updated.id,
+          actorUserId,
+          companyId: updated.companyId,
+          beforeData: { status: existing.status },
+          afterData: { status: updated.status },
+        },
+      });
+
+      return updated;
     });
 
     return this.toResponse(order);

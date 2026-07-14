@@ -389,6 +389,16 @@ export function WalletPage() {
       render: (item) => item.remark || '-',
     },
     {
+      key: 'referenceType',
+      header: '关联类型',
+      render: (item) => item.referenceType || '-',
+    },
+    {
+      key: 'referenceId',
+      header: '关联 ID',
+      render: (item) => item.referenceId || '-',
+    },
+    {
       key: 'idempotencyKey',
       header: '幂等键',
       render: (item) => item.idempotencyKey,

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@jiufa/database';
 import { PrismaService } from '../database/prisma.service';
 import {
   addWalletAmount,
@@ -62,7 +63,7 @@ type LedgerMutationMode =
   | 'capture'
   | 'refund_available';
 
-type ApplyLedgerParams = {
+export type ApplyLedgerParams = {
   walletAccountId: string;
   type: WalletTransactionType;
   amount: string;
@@ -72,6 +73,13 @@ type ApplyLedgerParams = {
   referenceType?: string;
   referenceId?: string;
   auditAction?: string;
+  tx?: Prisma.TransactionClient;
+};
+
+type LedgerMutationResult = {
+  idempotent: boolean;
+  account: WalletAccountRecord;
+  transaction: WalletTransactionRecord;
 };
 
 @Injectable()
@@ -151,150 +159,225 @@ export class WalletLedgerService {
     );
   }
 
+  async resolveCompanyWallet(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    currency: string,
+  ) {
+    const account = await tx.walletAccount.findFirst({
+      where: {
+        companyId,
+        currency,
+        userId: null,
+      },
+    });
+
+    if (!account) {
+      throw new BadRequestException(
+        `Company wallet for currency "${currency}" not found`,
+      );
+    }
+
+    if (account.status !== 'ACTIVE') {
+      throw new BadRequestException('Company wallet is not active');
+    }
+
+    return account;
+  }
+
   private async applyMutation(
     params: ApplyLedgerParams,
     mode: LedgerMutationMode,
-  ) {
-    const existing = await this.findExistingTransaction(params.idempotencyKey);
+  ): Promise<LedgerMutationResult> {
+    if (params.tx) {
+      return this.applyMutationCore(params.tx, params, mode);
+    }
+
+    const existing = await this.findExistingTransaction(
+      this.prisma,
+      params.idempotencyKey,
+    );
 
     if (existing) {
-      const account = await this.prisma.walletAccount.findUnique({
-        where: { id: existing.walletAccountId },
-      });
-
-      if (!account) {
-        throw new NotFoundException(
-          'Wallet account for existing transaction not found',
-        );
-      }
-
-      return {
-        idempotent: true,
-        account: this.normalizeAccount(account),
-        transaction: this.normalizeTransaction(existing),
-      };
+      return this.buildIdempotentResult(this.prisma, existing);
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`
-          SELECT "id"
-          FROM "WalletAccount"
-          WHERE "id" = ${params.walletAccountId}
-          FOR UPDATE
-        `;
-
-        const account = await tx.walletAccount.findUnique({
-          where: { id: params.walletAccountId },
-        });
-
-        if (!account) {
-          throw new NotFoundException(
-            `Wallet account with id "${params.walletAccountId}" not found`,
-          );
-        }
-
-        if (account.status !== 'ACTIVE') {
-          throw new BadRequestException('Wallet account is not active');
-        }
-
-        const amount = parsePositiveWalletAmount(params.amount);
-        const normalizedAccount = this.normalizeAccount(account);
-        const balances = this.computeNextBalances(
-          normalizedAccount.availableBalance,
-          normalizedAccount.frozenBalance,
-          amount,
-          mode,
-        );
-
-        const updated = await tx.walletAccount.update({
-          where: {
-            id: account.id,
-            version: account.version,
-          },
-          data: {
-            availableBalance: balances.availableAfter,
-            frozenBalance: balances.frozenAfter,
-            version: { increment: 1 },
-          },
-        });
-
-        const transaction = await tx.walletTransaction.create({
-          data: {
-            walletAccountId: account.id,
-            companyId: account.companyId,
-            type: params.type,
-            amount,
-            availableBefore: balances.availableBefore,
-            availableAfter: balances.availableAfter,
-            frozenBefore: balances.frozenBefore,
-            frozenAfter: balances.frozenAfter,
-            referenceType: params.referenceType ?? null,
-            referenceId: params.referenceId ?? null,
-            idempotencyKey: params.idempotencyKey,
-            actorUserId: params.actorUserId,
-            remark: params.remark ?? null,
-          },
-        });
-
-        if (params.auditAction) {
-          await tx.auditLog.create({
-            data: {
-              action: params.auditAction,
-              targetType: 'WalletAccount',
-              targetId: account.id,
-              actorUserId: params.actorUserId,
-              companyId: account.companyId,
-              beforeData: {
-                availableBalance: balances.availableBefore,
-                frozenBalance: balances.frozenBefore,
-              },
-              afterData: {
-                availableBalance: balances.availableAfter,
-                frozenBalance: balances.frozenAfter,
-                transactionId: transaction.id,
-                transactionType: transaction.type,
-                amount,
-                idempotencyKey: params.idempotencyKey,
-                remark: params.remark ?? null,
-              },
-            },
-          });
-        }
-
-        return {
-          idempotent: false,
-          account: this.normalizeAccount(updated),
-          transaction: this.normalizeTransaction(transaction),
-        };
-      });
+      return await this.prisma.$transaction(async (tx) =>
+        this.applyMutationCore(tx, params, mode),
+      );
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         const existingAfterRace = await this.findExistingTransaction(
+          this.prisma,
           params.idempotencyKey,
         );
 
         if (existingAfterRace) {
-          const account = await this.prisma.walletAccount.findUnique({
-            where: { id: existingAfterRace.walletAccountId },
-          });
-
-          if (!account) {
-            throw new NotFoundException(
-              'Wallet account for existing transaction not found',
-            );
-          }
-
-          return {
-            idempotent: true,
-            account: this.normalizeAccount(account),
-            transaction: this.normalizeTransaction(existingAfterRace),
-          };
+          return this.buildIdempotentResult(this.prisma, existingAfterRace);
         }
       }
 
       throw error;
     }
+  }
+
+  private async applyMutationCore(
+    tx: Prisma.TransactionClient,
+    params: ApplyLedgerParams,
+    mode: LedgerMutationMode,
+  ): Promise<LedgerMutationResult> {
+    const existing = await this.findExistingTransaction(
+      tx,
+      params.idempotencyKey,
+    );
+
+    if (existing) {
+      return this.buildIdempotentResult(tx, existing);
+    }
+
+    try {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "WalletAccount"
+        WHERE "id" = ${params.walletAccountId}
+        FOR UPDATE
+      `;
+
+      const account = await tx.walletAccount.findUnique({
+        where: { id: params.walletAccountId },
+      });
+
+      if (!account) {
+        throw new NotFoundException(
+          `Wallet account with id "${params.walletAccountId}" not found`,
+        );
+      }
+
+      if (account.status !== 'ACTIVE') {
+        throw new BadRequestException('Company wallet is not active');
+      }
+
+      const amount = parsePositiveWalletAmount(params.amount);
+      const normalizedAccount = this.normalizeAccount(account);
+      const balances = this.computeNextBalances(
+        normalizedAccount.availableBalance,
+        normalizedAccount.frozenBalance,
+        amount,
+        mode,
+      );
+
+      const updated = await tx.walletAccount.update({
+        where: {
+          id: account.id,
+          version: account.version,
+        },
+        data: {
+          availableBalance: balances.availableAfter,
+          frozenBalance: balances.frozenAfter,
+          version: { increment: 1 },
+        },
+      });
+
+      const transaction = await tx.walletTransaction.create({
+        data: {
+          walletAccountId: account.id,
+          companyId: account.companyId,
+          type: params.type,
+          amount,
+          availableBefore: balances.availableBefore,
+          availableAfter: balances.availableAfter,
+          frozenBefore: balances.frozenBefore,
+          frozenAfter: balances.frozenAfter,
+          referenceType: params.referenceType ?? null,
+          referenceId: params.referenceId ?? null,
+          idempotencyKey: params.idempotencyKey,
+          actorUserId: params.actorUserId,
+          remark: params.remark ?? null,
+        },
+      });
+
+      if (params.auditAction) {
+        await tx.auditLog.create({
+          data: {
+            action: params.auditAction,
+            targetType: 'WalletAccount',
+            targetId: account.id,
+            actorUserId: params.actorUserId,
+            companyId: account.companyId,
+            beforeData: {
+              availableBalance: balances.availableBefore,
+              frozenBalance: balances.frozenBefore,
+            },
+            afterData: {
+              availableBalance: balances.availableAfter,
+              frozenBalance: balances.frozenAfter,
+              transactionId: transaction.id,
+              transactionType: transaction.type,
+              amount,
+              idempotencyKey: params.idempotencyKey,
+              remark: params.remark ?? null,
+            },
+          },
+        });
+      }
+
+      return {
+        idempotent: false,
+        account: this.normalizeAccount(updated),
+        transaction: this.normalizeTransaction(transaction),
+      };
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        const existingAfterRace = await this.findExistingTransaction(
+          tx,
+          params.idempotencyKey,
+        );
+
+        if (existingAfterRace) {
+          return this.buildIdempotentResult(tx, existingAfterRace);
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  private async buildIdempotentResult(
+    db: Prisma.TransactionClient | PrismaService,
+    existing: {
+      walletAccountId: string;
+      id: string;
+      companyId: string;
+      type: WalletTransactionType;
+      amount: { toString(): string };
+      availableBefore: { toString(): string };
+      availableAfter: { toString(): string };
+      frozenBefore: { toString(): string };
+      frozenAfter: { toString(): string };
+      referenceType: string | null;
+      referenceId: string | null;
+      idempotencyKey: string;
+      actorUserId: string | null;
+      remark: string | null;
+      createdAt: Date;
+    },
+  ): Promise<LedgerMutationResult> {
+    const account = await db.walletAccount.findUnique({
+      where: { id: existing.walletAccountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(
+        'Wallet account for existing transaction not found',
+      );
+    }
+
+    return {
+      idempotent: true,
+      account: this.normalizeAccount(account),
+      transaction: this.normalizeTransaction(existing),
+    };
   }
 
   private computeNextBalances(
@@ -424,8 +507,11 @@ export class WalletLedgerService {
     };
   }
 
-  private async findExistingTransaction(idempotencyKey: string) {
-    return this.prisma.walletTransaction.findUnique({
+  private findExistingTransaction(
+    db: Prisma.TransactionClient | PrismaService,
+    idempotencyKey: string,
+  ) {
+    return db.walletTransaction.findUnique({
       where: { idempotencyKey },
     });
   }
@@ -474,11 +560,7 @@ export class WalletLedgerService {
     };
   }
 
-  toMutationResponse(result: {
-    idempotent: boolean;
-    account: WalletAccountRecord;
-    transaction: WalletTransactionRecord;
-  }) {
+  toMutationResponse(result: LedgerMutationResult) {
     return {
       idempotent: result.idempotent,
       account: this.toAccountResponse(result.account),
