@@ -1,23 +1,10 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import {
-  TERMINAL_ORDER_STATUSES,
-  type OrderStatus,
-} from '../orders/dto/order.validation';
-import {
-  buildOrderWalletIdempotencyKey,
-  getOrderCurrency,
-} from '../wallets/order-currency.util';
-import { WalletLedgerService } from '../wallets/wallet-ledger.service';
-import { walletAmountToString } from '../wallets/wallet-decimal.util';
+import type { OrderStatus } from '../orders/dto/order.validation';
 import { CreateSmsDto } from './dto/create-sms.dto';
 import { ListSmsQueryDto } from './dto/list-sms-query.dto';
 import type { SmsStatus } from './dto/sms.validation';
+import { OrderSmsCompletionService } from './order-sms-completion.service';
 
 type SmsFilters = {
   companyId?: string;
@@ -94,13 +81,11 @@ const smsSelect = {
   order: { select: orderSelect },
 } as const;
 
-const terminalStatusSet = new Set<string>(TERMINAL_ORDER_STATUSES);
-
 @Injectable()
 export class SmsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly walletLedgerService: WalletLedgerService,
+    private readonly orderSmsCompletionService: OrderSmsCompletionService,
   ) {}
 
   async findAll(query: ListSmsQueryDto) {
@@ -167,123 +152,14 @@ export class SmsService {
     dto: CreateSmsDto,
     actorUserId: string,
   ) {
-    const existing = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: {
-        id: true,
-        companyId: true,
-        status: true,
-        phoneResourceId: true,
-        amount: true,
-      },
-    });
-
-    if (!existing) {
-      throw new NotFoundException(`Order with id "${orderId}" not found`);
-    }
-
-    if (existing.companyId !== dto.companyId) {
-      throw new BadRequestException('Order must belong to the request company');
-    }
-
-    if (terminalStatusSet.has(existing.status)) {
-      throw new ConflictException('Order is already in a terminal status');
-    }
-
-    if (existing.status !== 'WAIT_SMS') {
-      throw new BadRequestException(
-        'Only orders in WAIT_SMS status can receive sms',
-      );
-    }
-
-    const code = dto.code?.trim() || null;
-    const content = dto.content?.trim() || null;
-
-    if (!code && !content) {
-      throw new BadRequestException('code 和 content 至少填写一项');
-    }
-
-    const receivedAt = dto.receivedAt ? new Date(dto.receivedAt) : new Date();
-    const orderAmount = walletAmountToString(existing.amount);
-    const orderCurrency = getOrderCurrency();
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const walletAccount = await this.walletLedgerService.resolveCompanyWallet(
-        tx,
-        existing.companyId,
-        orderCurrency,
-      );
-
-      await this.walletLedgerService.capture({
-        tx,
-        walletAccountId: walletAccount.id,
-        amount: orderAmount,
-        idempotencyKey: buildOrderWalletIdempotencyKey(orderId, 'capture'),
-        actorUserId,
-        referenceType: 'Order',
-        referenceId: orderId,
-        remark: 'Order sms success capture',
-      });
-
-      const phoneUpdate = await tx.phoneResource.updateMany({
-        where: {
-          id: existing.phoneResourceId,
-          status: 'LOCKED',
-        },
-        data: {
-          status: 'USED',
-        },
-      });
-
-      if (phoneUpdate.count !== 1) {
-        throw new ConflictException(
-          'Phone resource is not locked by this order',
-        );
-      }
-
-      const order = await tx.order.update({
-        where: { id: orderId },
-        data: {
-          status: 'SUCCESS',
-        },
-        select: orderSelect,
-      });
-
-      const sms = await tx.sms.create({
-        data: {
-          orderId,
-          code,
-          content,
-          status: 'RECEIVED',
-          receivedAt,
-        },
-        select: smsSelect,
-      });
-
-      await tx.auditLog.create({
-        data: {
-          action: 'sms.create',
-          targetType: 'Sms',
-          targetId: sms.id,
-          actorUserId,
-          companyId: order.companyId,
-          afterData: this.toAuditSmsData(sms),
-        },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          action: 'order.status',
-          targetType: 'Order',
-          targetId: order.id,
-          actorUserId,
-          companyId: order.companyId,
-          beforeData: { status: existing.status },
-          afterData: { status: order.status },
-        },
-      });
-
-      return sms;
+    const result = await this.orderSmsCompletionService.completeForOrder({
+      orderId,
+      companyId: dto.companyId,
+      code: dto.code,
+      content: dto.content,
+      receivedAt: dto.receivedAt ? new Date(dto.receivedAt) : undefined,
+      actorUserId,
+      source: 'manual',
     });
 
     return this.toResponse(result);
@@ -326,18 +202,6 @@ export class SmsService {
   private toResponse<T extends SmsRecord & { order?: unknown }>(sms: T) {
     return {
       ...sms,
-      receivedAt: sms.receivedAt?.toISOString() ?? null,
-      createdAt: sms.createdAt.toISOString(),
-    };
-  }
-
-  private toAuditSmsData(sms: SmsRecord) {
-    return {
-      id: sms.id,
-      orderId: sms.orderId,
-      code: sms.code,
-      content: sms.content,
-      status: sms.status,
       receivedAt: sms.receivedAt?.toISOString() ?? null,
       createdAt: sms.createdAt.toISOString(),
     };
