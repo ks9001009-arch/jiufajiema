@@ -14,7 +14,7 @@ import { walletAmountToString } from '../wallets/wallet-decimal.util';
 import { WalletLedgerService } from '../wallets/wallet-ledger.service';
 import { OrderTerminalStateConflictException } from './order-terminal-state-conflict.exception';
 
-export type OrderSmsCompletionSource = 'manual' | 'webhook';
+export type OrderSmsCompletionSource = 'manual' | 'webhook' | 'polling';
 
 export type CompleteOrderSmsInput = {
   orderId: string;

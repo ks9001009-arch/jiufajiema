@@ -1,4 +1,4 @@
-export type ProviderSmsIngressSource = 'webhook';
+export type ProviderSmsIngressSource = 'webhook' | 'polling';
 
 export type ProviderSmsIngressInput = {
   source: ProviderSmsIngressSource;

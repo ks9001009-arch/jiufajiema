@@ -50,7 +50,7 @@ export class ProviderSmsIngressService {
         content,
         receivedAt: input.receivedAt,
         actorUserId: null,
-        source: 'webhook',
+        source: input.source,
       });
 
       return {
