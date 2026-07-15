@@ -27,12 +27,12 @@
 ├─────────────────────────────────────┤
 │    packages/database                │  数据层
 ├─────────────────────────────────────┤
-│    supplier adapters (api 内)       │  外部供应商
+│    Provider Adapter (api 内)        │  外部供应商协议边界
 └─────────────────────────────────────┘
 ```
 
 - **前端**：调用 API，渲染状态；状态文案来自后端或 `shared` 枚举，禁止散落业务字符串。
-- **后端**：按模块拆分；供应商调用统一经 **supplier adapter**；长耗时逻辑进 **jobs**。
+- **后端**：按模块拆分；供应商调用统一经 **Provider Adapter**；长耗时逻辑进 **jobs**。详细设计见 [provider-adapter-design.md](./provider-adapter-design.md)。
 - **数据库**：变更仅通过 **migration**；余额走 **钱包流水**；订单状态变更写 **操作日志**；重要操作写 **audit log**。
 
 ## 横切关注点
