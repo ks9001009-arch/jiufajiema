@@ -26,6 +26,32 @@ export class ProviderAdapterFactory {
   async resolve(
     input: ResolveProviderAdapterInput,
   ): Promise<AdapterResolution> {
+    return this.resolveFromDatabase({
+      providerId: input.providerId,
+      expectedCompanyId: input.companyId,
+      actorUserId: input.actorUserId,
+    });
+  }
+
+  /**
+   * Resolve adapter using only providerId.
+   * companyId is always loaded from the database (never from the client).
+   */
+  async resolveByProviderId(
+    providerId: string,
+    actorUserId?: string | null,
+  ): Promise<AdapterResolution> {
+    return this.resolveFromDatabase({
+      providerId,
+      actorUserId,
+    });
+  }
+
+  private async resolveFromDatabase(input: {
+    providerId: string;
+    expectedCompanyId?: string;
+    actorUserId?: string | null;
+  }): Promise<AdapterResolution> {
     const provider = await this.prisma.provider.findUnique({
       where: { id: input.providerId },
       select: {
@@ -48,7 +74,10 @@ export class ProviderAdapterFactory {
       });
     }
 
-    if (provider.companyId !== input.companyId) {
+    if (
+      input.expectedCompanyId !== undefined &&
+      provider.companyId !== input.expectedCompanyId
+    ) {
       throw new ProviderAdapterError({
         code: 'PROVIDER_COMPANY_MISMATCH',
         category: 'INVALID_REQUEST',

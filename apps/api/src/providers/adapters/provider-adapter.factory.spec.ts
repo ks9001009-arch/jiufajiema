@@ -145,4 +145,19 @@ describe('ProviderAdapterFactory', () => {
       actorUserId: 'user-1',
     });
   });
+
+  it('resolveByProviderId loads companyId from database', async () => {
+    findUnique.mockResolvedValue({
+      id: providerId,
+      companyId,
+      adapter: MANUAL_PROVIDER_ADAPTER_CODE,
+      config: null,
+      status: 'ACTIVE',
+    });
+
+    const resolution = await factory.resolveByProviderId(providerId);
+
+    expect(resolution.context.companyId).toBe(companyId);
+    expect(resolution.adapter).toBe(manualAdapter);
+  });
 });

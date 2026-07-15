@@ -10,6 +10,7 @@ import { HealthModule } from './health/health.module';
 import { JobsModule } from './jobs/jobs.module';
 import { OrdersModule } from './orders/orders.module';
 import { PhoneResourcesModule } from './phone-resources/phone-resources.module';
+import { ProviderAdaptersModule } from './providers/adapters/adapters.module';
 import { SmsModule } from './sms/sms.module';
 import { ProvidersModule } from './providers/providers.module';
 import { RolesModule } from './roles/roles.module';
@@ -29,6 +30,7 @@ import { WalletsModule } from './wallets/wallets.module';
     TeamsModule,
     ServicesModule,
     ProvidersModule,
+    ProviderAdaptersModule,
     PhoneResourcesModule,
     OrdersModule,
     JobsModule,

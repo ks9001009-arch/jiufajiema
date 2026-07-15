@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { buildOrderWalletIdempotencyKey } from '../wallets/order-currency.util';
 import { OrderSmsCompletionService } from './order-sms-completion.service';
+import { OrderTerminalStateConflictException } from './order-terminal-state-conflict.exception';
 
 describe('OrderSmsCompletionService', () => {
   const orderId = 'order-1';
@@ -32,6 +33,7 @@ describe('OrderSmsCompletionService', () => {
     orderFindUnique = jest.fn().mockImplementation(async () => ({
       id: orderId,
       companyId,
+      providerId: 'provider-1',
       status: lockedOrderStatus,
       phoneResourceId,
       amount: '1.0000',
@@ -195,7 +197,9 @@ describe('OrderSmsCompletionService', () => {
   it('rejects SUCCESS (terminal) after lock without capture', async () => {
     lockedOrderStatus = 'SUCCESS';
 
-    await expect(complete()).rejects.toBeInstanceOf(ConflictException);
+    await expect(complete()).rejects.toBeInstanceOf(
+      OrderTerminalStateConflictException,
+    );
     expect(capture).not.toHaveBeenCalled();
     expect(smsCreate).not.toHaveBeenCalled();
   });
@@ -203,7 +207,9 @@ describe('OrderSmsCompletionService', () => {
   it('rejects CANCELLED after lock (timeout-first semantics)', async () => {
     lockedOrderStatus = 'CANCELLED';
 
-    await expect(complete()).rejects.toBeInstanceOf(ConflictException);
+    await expect(complete()).rejects.toBeInstanceOf(
+      OrderTerminalStateConflictException,
+    );
     expect(capture).not.toHaveBeenCalled();
   });
 
@@ -220,9 +226,16 @@ describe('OrderSmsCompletionService', () => {
 
     lockedOrderStatus = 'SUCCESS';
     await expect(complete({ code: '9999' })).rejects.toBeInstanceOf(
-      ConflictException,
+      OrderTerminalStateConflictException,
     );
     expect(capture).toHaveBeenCalledTimes(1);
     expect(smsCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects providerId mismatch after lock', async () => {
+    await expect(
+      complete({ providerId: 'other-provider' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(capture).not.toHaveBeenCalled();
   });
 });

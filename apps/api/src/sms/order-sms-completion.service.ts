@@ -12,12 +12,15 @@ import {
 } from '../wallets/order-currency.util';
 import { walletAmountToString } from '../wallets/wallet-decimal.util';
 import { WalletLedgerService } from '../wallets/wallet-ledger.service';
+import { OrderTerminalStateConflictException } from './order-terminal-state-conflict.exception';
 
-export type OrderSmsCompletionSource = 'manual';
+export type OrderSmsCompletionSource = 'manual' | 'webhook';
 
 export type CompleteOrderSmsInput = {
   orderId: string;
   companyId: string;
+  /** When set, validated against Order.providerId after row lock. */
+  providerId?: string;
   code?: string | null;
   content?: string | null;
   receivedAt?: Date;
@@ -125,6 +128,7 @@ export class OrderSmsCompletionService {
         select: {
           id: true,
           companyId: true,
+          providerId: true,
           status: true,
           phoneResourceId: true,
           amount: true,
@@ -143,8 +147,17 @@ export class OrderSmsCompletionService {
         );
       }
 
+      if (
+        input.providerId !== undefined &&
+        existing.providerId !== input.providerId
+      ) {
+        throw new BadRequestException(
+          'Order must belong to the selected provider',
+        );
+      }
+
       if (terminalStatusSet.has(existing.status)) {
-        throw new ConflictException('Order is already in a terminal status');
+        throw new OrderTerminalStateConflictException(existing.status);
       }
 
       if (existing.status !== 'WAIT_SMS') {
