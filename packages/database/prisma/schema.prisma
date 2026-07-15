@@ -269,6 +269,10 @@ model Order {
 
   amount Decimal @db.Decimal(10, 4)
 
+  expiresAt    DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -280,6 +284,7 @@ model Order {
   @@index([teamId])
   @@index([phoneResourceId])
   @@index([createdAt])
+  @@index([status, expiresAt])
 }
 
 model Sms {

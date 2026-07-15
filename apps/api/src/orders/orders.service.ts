@@ -2,11 +2,14 @@ import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { CountryAccessService } from '../country-access/country-access.service';
 import { PrismaService } from '../database/prisma.service';
+import { OrderTimeoutQueueService } from '../jobs/order-timeout-queue.service';
 import {
   buildOrderWalletIdempotencyKey,
   getOrderCurrency,
@@ -20,6 +23,7 @@ import {
   type OrderStatus,
   type TerminalOrderStatus,
 } from './dto/order.validation';
+import { getOrderWaitSmsTimeoutSeconds } from './order-timeout.util';
 
 type OrderRecord = {
   id: string;
@@ -31,6 +35,9 @@ type OrderRecord = {
   phoneResourceId: string;
   status: string;
   amount: { toString(): string };
+  expiresAt: Date | null;
+  cancelledAt: Date | null;
+  cancelReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -47,6 +54,17 @@ type OrderFilters = {
   createdTo?: string;
   page?: number;
   pageSize?: number;
+};
+
+export type OrderTimeoutResult = {
+  handled: boolean;
+  idempotent: boolean;
+  reason:
+    | 'not_found'
+    | 'not_wait_sms'
+    | 'not_expired'
+    | 'cancelled'
+    | 'already_processed';
 };
 
 const companySelect = {
@@ -100,6 +118,9 @@ const orderSelect = {
   phoneResourceId: true,
   status: true,
   amount: true,
+  expiresAt: true,
+  cancelledAt: true,
+  cancelReason: true,
   createdAt: true,
   updatedAt: true,
   company: { select: companySelect },
@@ -116,6 +137,8 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly countryAccessService: CountryAccessService,
     private readonly walletLedgerService: WalletLedgerService,
+    @Inject(forwardRef(() => OrderTimeoutQueueService))
+    private readonly orderTimeoutQueueService: OrderTimeoutQueueService,
   ) {}
 
   async findAll(query: ListOrdersQueryDto) {
@@ -211,6 +234,9 @@ export class OrdersService {
     const orderId = randomUUID();
     const orderCurrency = getOrderCurrency();
     const orderAmount = walletAmountToString(dto.amount);
+    const expiresAt = new Date(
+      Date.now() + getOrderWaitSmsTimeoutSeconds() * 1000,
+    );
 
     const order = await this.prisma.$transaction(async (tx) => {
       const walletAccount = await this.walletLedgerService.resolveCompanyWallet(
@@ -246,6 +272,7 @@ export class OrdersService {
           phoneResourceId: dto.phoneResourceId,
           status: 'WAIT_SMS',
           amount: orderAmount,
+          expiresAt,
         },
         select: orderSelect,
       });
@@ -275,7 +302,121 @@ export class OrdersService {
       return created;
     });
 
+    await this.orderTimeoutQueueService.scheduleOrderTimeout(orderId, expiresAt);
+
     return this.toResponse(order);
+  }
+
+  async timeoutOrder(orderId: string): Promise<OrderTimeoutResult> {
+    const orderCurrency = getOrderCurrency();
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id"
+        FROM "Order"
+        WHERE "id" = ${orderId}
+        FOR UPDATE
+      `;
+
+      const existing = await tx.order.findUnique({
+        where: { id: orderId },
+        select: orderSelect,
+      });
+
+      if (!existing) {
+        return {
+          handled: false,
+          idempotent: true,
+          reason: 'not_found',
+        };
+      }
+
+      if (existing.status !== 'WAIT_SMS') {
+        return {
+          handled: false,
+          idempotent: true,
+          reason: 'not_wait_sms',
+        };
+      }
+
+      if (existing.expiresAt && existing.expiresAt.getTime() > Date.now()) {
+        return {
+          handled: false,
+          idempotent: true,
+          reason: 'not_expired',
+        };
+      }
+
+      const orderAmount = walletAmountToString(existing.amount);
+      const walletAccount = await this.walletLedgerService.resolveCompanyWallet(
+        tx,
+        existing.companyId,
+        orderCurrency,
+      );
+
+      await this.walletLedgerService.release({
+        tx,
+        walletAccountId: walletAccount.id,
+        amount: orderAmount,
+        idempotencyKey: buildOrderWalletIdempotencyKey(orderId, 'release'),
+        actorUserId: null,
+        referenceType: 'Order',
+        referenceId: orderId,
+        remark: 'Order timeout release',
+      });
+
+      const phoneUpdate = await tx.phoneResource.updateMany({
+        where: {
+          id: existing.phoneResourceId,
+          status: 'LOCKED',
+        },
+        data: {
+          status: 'AVAILABLE',
+        },
+      });
+
+      if (phoneUpdate.count !== 1) {
+        throw new ConflictException(
+          'Phone resource is not locked by this order',
+        );
+      }
+
+      const cancelledAt = new Date();
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt,
+          cancelReason: 'TIMEOUT',
+        },
+        select: orderSelect,
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'order.timeout',
+          targetType: 'Order',
+          targetId: updated.id,
+          actorUserId: null,
+          companyId: updated.companyId,
+          beforeData: {
+            status: existing.status,
+            expiresAt: existing.expiresAt?.toISOString() ?? null,
+          },
+          afterData: {
+            status: updated.status,
+            cancelledAt: cancelledAt.toISOString(),
+            cancelReason: updated.cancelReason,
+          },
+        },
+      });
+
+      return {
+        handled: true,
+        idempotent: false,
+        reason: 'cancelled',
+      };
+    });
   }
 
   async updateStatus(
@@ -360,6 +501,12 @@ export class OrdersService {
         where: { id },
         data: {
           status: dto.status,
+          ...(dto.status === 'CANCELLED'
+            ? {
+                cancelledAt: new Date(),
+                cancelReason: 'MANUAL',
+              }
+            : {}),
         },
         select: orderSelect,
       });
@@ -500,6 +647,9 @@ export class OrdersService {
     return {
       ...order,
       amount: order.amount.toString(),
+      expiresAt: order.expiresAt?.toISOString() ?? null,
+      cancelledAt: order.cancelledAt?.toISOString() ?? null,
+      cancelReason: order.cancelReason,
     };
   }
 
@@ -514,6 +664,7 @@ export class OrdersService {
       phoneResourceId: order.phoneResourceId,
       status: order.status,
       amount: order.amount.toString(),
+      expiresAt: order.expiresAt?.toISOString() ?? null,
       createdAt: order.createdAt.toISOString(),
       updatedAt: order.updatedAt.toISOString(),
     };

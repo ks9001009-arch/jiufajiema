@@ -7,6 +7,7 @@ import { CountryAccessModule } from './country-access/country-access.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { JobsModule } from './jobs/jobs.module';
 import { OrdersModule } from './orders/orders.module';
 import { PhoneResourcesModule } from './phone-resources/phone-resources.module';
 import { SmsModule } from './sms/sms.module';
@@ -30,6 +31,7 @@ import { WalletsModule } from './wallets/wallets.module';
     ProvidersModule,
     PhoneResourcesModule,
     OrdersModule,
+    JobsModule,
     SmsModule,
     WalletsModule,
     RolesModule,

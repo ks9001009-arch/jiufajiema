@@ -68,7 +68,7 @@ export type ApplyLedgerParams = {
   type: WalletTransactionType;
   amount: string;
   idempotencyKey: string;
-  actorUserId: string;
+  actorUserId?: string | null;
   remark?: string;
   referenceType?: string;
   referenceId?: string;
@@ -292,7 +292,7 @@ export class WalletLedgerService {
           referenceType: params.referenceType ?? null,
           referenceId: params.referenceId ?? null,
           idempotencyKey: params.idempotencyKey,
-          actorUserId: params.actorUserId,
+          actorUserId: params.actorUserId ?? null,
           remark: params.remark ?? null,
         },
       });
@@ -303,7 +303,7 @@ export class WalletLedgerService {
             action: params.auditAction,
             targetType: 'WalletAccount',
             targetId: account.id,
-            actorUserId: params.actorUserId,
+            actorUserId: params.actorUserId ?? null,
             companyId: account.companyId,
             beforeData: {
               availableBalance: balances.availableBefore,
