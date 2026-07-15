@@ -37,6 +37,11 @@ const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   CANCELLED: '已取消',
 }
 
+const ORDER_CANCEL_REASON_LABELS: Record<string, string> = {
+  TIMEOUT: '自动超时',
+  MANUAL: '手工取消',
+}
+
 const AMOUNT_PATTERN = /^(?:0|[1-9]\d{0,5})(?:\.\d{1,4})?$/
 
 type OrderFilterState = {
@@ -84,7 +89,7 @@ function toOrderQueryParams(
   }
 }
 
-function formatDate(value?: string) {
+function formatDate(value?: string | null) {
   if (!value) {
     return '-'
   }
@@ -102,6 +107,38 @@ function formatDate(value?: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function formatCancelReason(reason?: string | null) {
+  if (!reason) {
+    return '-'
+  }
+
+  return ORDER_CANCEL_REASON_LABELS[reason] || reason
+}
+
+function formatRemainingTime(expiresAt?: string | null, nowMs = Date.now()) {
+  if (!expiresAt) {
+    return '-'
+  }
+
+  const expiresMs = new Date(expiresAt).getTime()
+
+  if (Number.isNaN(expiresMs)) {
+    return '-'
+  }
+
+  const diffMs = expiresMs - nowMs
+
+  if (diffMs <= 0) {
+    return '已超时'
+  }
+
+  const totalSeconds = Math.floor(diffMs / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  return `${minutes} 分 ${seconds.toString().padStart(2, '0')} 秒`
 }
 
 export function OrderPage() {
@@ -139,6 +176,7 @@ export function OrderPage() {
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [nowMs, setNowMs] = useState(() => Date.now())
 
   const effectiveCountrySet = new Set(
     effectiveCountries.map((code) => code.toUpperCase()),
@@ -273,6 +311,16 @@ export function OrderPage() {
 
   useEffect(() => {
     loadData()
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 30_000)
+
+    return () => {
+      window.clearInterval(timer)
+    }
   }, [])
 
   useEffect(() => {
@@ -597,6 +645,28 @@ export function OrderPage() {
       key: 'amount',
       header: '金额',
       render: (order) => order.amount,
+    },
+    {
+      key: 'expiresAt',
+      header: '到期时间',
+      render: (order) =>
+        order.status === 'WAIT_SMS' ? formatDate(order.expiresAt) : '-',
+    },
+    {
+      key: 'remaining',
+      header: '剩余时间',
+      render: (order) =>
+        order.status === 'WAIT_SMS'
+          ? formatRemainingTime(order.expiresAt, nowMs)
+          : '-',
+    },
+    {
+      key: 'cancelReason',
+      header: '取消原因',
+      render: (order) =>
+        order.status === 'CANCELLED'
+          ? formatCancelReason(order.cancelReason)
+          : '-',
     },
     {
       key: 'createdAt',

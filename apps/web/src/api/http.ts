@@ -440,6 +440,9 @@ export type Order = {
   phoneResourceId: string
   status: OrderStatus
   amount: string
+  expiresAt?: string | null
+  cancelledAt?: string | null
+  cancelReason?: string | null
   company?: {
     id: string
     name: string

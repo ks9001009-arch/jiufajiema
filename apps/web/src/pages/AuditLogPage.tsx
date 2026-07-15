@@ -55,6 +55,7 @@ function getActionText(action: string) {
     'order.create': '新增订单',
     'order.status': '订单状态变更',
     'order.force_success': '手工完成订单',
+    'order.timeout': '订单自动超时',
     'sms.create': '收到短信',
     'wallet.recharge': '钱包充值',
     'wallet.adjustment': '钱包调账',
